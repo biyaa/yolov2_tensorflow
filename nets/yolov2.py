@@ -59,6 +59,7 @@ def reorg(inputs,shape):
     #body = lambda x:
 
     output = reorg_func(inputs)
+    output = slim.array_ops.transpose(output,perm=[0,2,3,1])
     print output
     return slim.array_ops.reshape(output,shape)
     
@@ -90,7 +91,7 @@ def conv2d_with_linear(inputs,filters,kernel_size,stride,padding,scope):
                       biases_regularizer=slim.l2_regularizer(0.0005)):
         part1 = slim.conv2d(inputs, filters, kernel_size, stride, padding='SAME', scope=scope)
         return part1
-
+#data_format="NCHW",
 def scale_bias(inputs,data_format=DATA_FORMAT_NHWC,scope='BatchNorm'):
     with tf.variable_scope(scope +'/BatchNorm') as scope:
         inputs_shape = inputs.get_shape()
