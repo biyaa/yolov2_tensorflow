@@ -50,6 +50,11 @@ def get_data_from_txt(id,darknet_varname,shape):
     data = DATA_IN_MEMORY[id]
     if darknet_varname == "weights":
         val = np.array(data['weights']).astype('float32')
+        print "o-val:",shape
+        val = np.reshape(val,(shape[3],shape[2],shape[0],shape[1]))
+        print "val:",val.shape
+        val = np.transpose(val,(2,3,1,0))
+        print "val:",val.shape
 
     if darknet_varname == "biases":
         val = np.array(data['biases']).astype('float32')
@@ -66,6 +71,7 @@ def get_data_from_txt(id,darknet_varname,shape):
     if darknet_varname == "beta":
         val = np.zeros(shape,dtype=np.float32)
     val = np.reshape(val,shape)
+    print "val:",val.shape
     return val
         
 

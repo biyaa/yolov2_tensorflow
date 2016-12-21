@@ -17,10 +17,10 @@ def read_txt_data(path,filename):
       data.append(row)
   return data
 
-data = read_txt_data('./','img.txt')
-inputs = np.array(data,dtype=np.float32)
-inputs = np.reshape(1,416,416,3),dtype=np.float32)
+#inputs = np.array(data,dtype=np.float32)
+inputs = np.ones((1,416,416,3),dtype=np.float32)
 net = yolo.yolo_net(inputs)
+print net
 init = tf.global_variables_initializer()
 with tf.Session() as sess:
     sess.run(init)

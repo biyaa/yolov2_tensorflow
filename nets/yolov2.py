@@ -19,6 +19,7 @@ _reorg_module = tf.load_op_library(
             os.path.join(tf.resource_loader.get_data_files_path(),
                                 'core/re_org.so'))
 reorg_func = _reorg_module.re_org
+#def cond_cls_region(
 def yolo_net(inputs):
         layer0 = conv2d(inputs, 32, [3, 3], 1, padding='SAME', scope='conv0')
         layer1 = slim.max_pool2d(layer0, [2, 2], scope='pool1')
@@ -51,13 +52,30 @@ def yolo_net(inputs):
         layer27 = slim.array_ops.concat(3,[layer26,layer24])
         layer28 = conv2d(layer27, 1024, [3, 3], 1, padding='SAME', scope='conv28')
         layer29 = conv2d_with_linear(layer28, 425, [1, 1], 1, padding='SAME', scope='conv29')
+        layer29 = slim.array_ops.reshape(layer29,[1,13,13,5,85])
+        #print layer29
+
+
+        #print layer29[:,:,:,:,0:4]
+        layer30 = slim.nn.sigmoid(layer29[:,:,:,:,0:5],name="coords_scale_exp")
+
+        layer40 = tf.reduce_max(layer29[:,:,:,:,5:],4,name="max_class")
+        layer41 = slim.array_ops.reshape(layer40,[1,13,13,5,1],"reshape_max")
+        layer42 = slim.math_ops.sub(layer29[:,:,:,:,5:],layer41,name="sub_max")
+        layer43 = slim.nn.softmax(layer42,name="class_softmax")
+
+        layer50 = slim.array_ops.concat(4,[layer30,layer43])
+        print layer30
+        print layer43
         
-        return layer29
+        return layer50
 
 def reorg(inputs,shape):
-    print inputs.get_shape()
+    print inputs
     #body = lambda x:
+    inputs = slim.array_ops.transpose(inputs,perm=[0,3,1,2])
 
+    print inputs
     output = reorg_func(inputs)
     output = slim.array_ops.transpose(output,perm=[0,2,3,1])
     print output

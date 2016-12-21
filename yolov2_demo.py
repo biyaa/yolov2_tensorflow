@@ -11,12 +11,12 @@ def logistic_activate(x):
 
 def get_region_box(boxes,i,j,n,anchors):
     box=np.zeros((4),dtype=np.float32)
-    box[0] = (i + logistic_activate(boxes[i,j,n,0]))/cfg.cell_size
-    box[1] = (j + logistic_activate(boxes[i,j,n,1]))/cfg.cell_size
+    box[0] = (i + boxes[i,j,n,0])/cfg.cell_size
+    box[1] = (j + boxes[i,j,n,1])/cfg.cell_size
     #box[2] = (0.5 * logistic_activate(boxes[i,j,n,2]))/cfg.cell_size
     #box[3] = (0.5 * logistic_activate(boxes[i,j,n,3]))/cfg.cell_size
-    box[2] = (anchors[2*n] * logistic_activate(boxes[i,j,n,2]))/cfg.cell_size
-    box[3] = (anchors[2*n] * logistic_activate(boxes[i,j,n,3]))/cfg.cell_size
+    box[2] = (anchors[2*n] * boxes[i,j,n,2])/cfg.cell_size
+    box[3] = (anchors[2*n] * boxes[i,j,n,3])/cfg.cell_size
     return box
 
 def iou(box1, box2):
@@ -32,13 +32,13 @@ def iou(box1, box2):
     
     
 def interpret_output(output):
-    output = np.transpose(output,(0,2,1))
+    #output = np.transpose(output,(0,2,1))
     probs = np.zeros((cfg.cell_size, cfg.cell_size,
                       cfg.boxes_per_cell, cfg.num_class))
     #print output.shape
     info_num = cfg.coords + cfg.scale + cfg.num_class
-    output = np.reshape(output,(cfg.cell_size,cfg.cell_size,cfg.boxes_per_cell,info_num))
-    class_probs = np.reshape(output[:,:,:,cfg.coords+1:], ( cfg.cell_size, cfg.cell_size,cfg.boxes_per_cell, cfg.num_class))
+    #output = np.reshape(output,(cfg.cell_size,cfg.cell_size,cfg.boxes_per_cell,info_num))
+    class_probs = np.reshape(output[:,:,:,cfg.coords+1:], (cfg.cell_size, cfg.cell_size,cfg.boxes_per_cell, cfg.num_class))
     #scales = np.reshape(output[:,:,:,cfg.coords], ( cfg.cell_size, cfg.cell_size,cfg.boxes_per_cell, cfg.scale))
     scales = np.zeros((cfg.cell_size, cfg.cell_size,cfg.boxes_per_cell),dtype=np.float32)
     scales = output[:,:,:,cfg.coords]
