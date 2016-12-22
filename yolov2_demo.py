@@ -1,9 +1,17 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Dec 22 18:07:21 2016
+
+@author: huangguoxiong
+"""
+
 import tensorflow as tf
 import numpy as np
 import nets.yolov2 as yolo
 import os
 import cv2
 import config.config as cfg
+import utils.box as box
 from utils.timer import Timer
 slim = tf.contrib.slim
 
@@ -39,34 +47,58 @@ def interpret_output(output):
             for n in xrange(cfg.boxes_per_cell):
                 boxes[row,col,n] = get_region_box(boxes,col,row,n,cfg.anchors)
 
-    #boxes *= cfg.image_size
     print "box",boxes.shape
 
     probs = class_probs * scales[:,:,:,np.newaxis]
+    filter_mat_probs = np.array(probs>=cfg.threshold,dtype='bool')
+    filter_mat_boxes = np.nonzero(filter_mat_probs)
+    boxes_filtered = boxes[filter_mat_boxes[0],filter_mat_boxes[1],filter_mat_boxes[2]]
+    probs_filtered = probs[filter_mat_probs]
+    classes_num_filtered = np.argmax(filter_mat_probs,axis=3)[filter_mat_boxes[0],filter_mat_boxes[1],filter_mat_boxes[2]] 
 
-    print "probs",probs.shape
-    probs[probs < cfg.threshold] =0
-    probs_max = np.max(probs,3)
-    probs_max_index = np.argmax(probs,3)
-
-    #filter_mat_probs = np.array(probs >= cfg.threshold, dtype='bool')
-    probs_mask = np.where(probs_max >= cfg.threshold)
-    #filter_mat_boxes = np.nonzero(filter_mat_probs)
-    probs_masked = probs_max[probs_mask]
-    probs_index_masked = probs_max_index[probs_mask]
-    boxes_masked = boxes[probs_mask]
-    print probs_mask
+    argsort = np.array(np.argsort(probs_filtered))[::-1]
+    boxes_filtered = boxes_filtered[argsort]
+    probs_filtered = probs_filtered[argsort]
+    classes_num_filtered = classes_num_filtered[argsort]
     
-
+    for i in range(len(boxes_filtered)):
+        if probs_filtered[i] == 0 : continue
+        for j in range(i+1,len(boxes_filtered)):
+            if box.box_iou(boxes_filtered[i],boxes_filtered[j]) > cfg.iou_threshold : 
+                probs_filtered[j] = 0.0
+    
+    filter_iou = np.array(probs_filtered>0.0,dtype='bool')
+    boxes_filtered = boxes_filtered[filter_iou]
+    probs_filtered = probs_filtered[filter_iou]
+    classes_num_filtered = classes_num_filtered[filter_iou]
     result = []
-    result_num = len(probs_mask[0]) if len(probs_mask)>0 else 0
-    print "num",result_num
-
-    for i in range(result_num):
-        result.append([cfg.cls[probs_index_masked[i]], boxes_masked[i][0], boxes_masked[
-                      i][1], boxes_masked[i][2], boxes_masked[i][3], probs_masked[i]*100])
+    for i in range(len(boxes_filtered)):
+        result.append([cfg.cls[classes_num_filtered[i]],boxes_filtered[i][0],boxes_filtered[i][1],boxes_filtered[i][2],boxes_filtered[i][3],probs_filtered[i]])
 
     return result
+    #print "probs",probs.shape
+    #probs[probs < cfg.threshold] =0
+    #probs_max = np.max(probs,3)
+    #probs_max_index = np.argmax(probs,3)
+
+    #probs_mask = np.where(probs_max >= cfg.threshold)
+    #probs_masked = probs_max[probs_mask]
+    #probs_index_masked = probs_max_index[probs_mask]
+    #boxes_masked = boxes[probs_mask]
+    #print probs_mask
+
+    ## 按类排序
+    #
+
+    #result = []
+    #result_num = len(probs_mask[0]) if len(probs_mask)>0 else 0
+    #print "num",result_num
+
+    #for i in range(result_num):
+    #    result.append([cfg.cls[probs_index_masked[i]], boxes_masked[i][0], boxes_masked[
+    #                  i][1], boxes_masked[i][2], boxes_masked[i][3], probs_masked[i]*100])
+
+    #return result
 
 def detect_from_cvmat(inputs):
     #print "inputs:",inputs
@@ -90,8 +122,9 @@ def detect_from_cvmat(inputs):
 def detect(img):
     #print img
     img_h, img_w, _ = img.shape
-    inputs = cv2.resize(img, (cfg.image_size, cfg.image_size))
-    inputs = cv2.cvtColor(inputs, cv2.COLOR_BGR2RGB).astype(np.float32)
+    inputs = cv2.resize(img, (cfg.image_size, cfg.image_size)).astype(np.float32)
+
+    #inputs = cv2.cvtColor(inputs, cv2.COLOR_BGR2RGB).astype(np.float32)
     inputs = (inputs / 255.0) 
     inputs = np.reshape(inputs, (1, cfg.image_size, cfg.image_size, 3))
     #inputs = np.transpose(inputs,(0,3,2,1))
@@ -127,7 +160,8 @@ def draw_result(img, result):
 def image_detector(imname, wait=0):
     print imname
     detect_timer = Timer()
-    image = cv2.imread(imname)
+    image = cv2.imread(imname,1)
+    print image.shape
 
     detect_timer.tic()
     result = detect(image)

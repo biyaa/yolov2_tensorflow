@@ -14,6 +14,7 @@ slim =  tf.contrib.slim
 # 4. 解决 reorg 问题 自定义op实现重组逻辑
 DATA_FORMAT_NCHW = 'NCHW'
 DATA_FORMAT_NHWC = 'NHWC'
+DEVICE ='/CPU:0'
 ALPHA = 0.1
 _reorg_module = tf.load_op_library(
             os.path.join(tf.resource_loader.get_data_files_path(),
@@ -124,7 +125,7 @@ def scale_bias(inputs,data_format=DATA_FORMAT_NHWC,scope='BatchNorm'):
                           shape=[num_features,],
                           initializer=tf.truncated_normal_initializer(stddev=0.1),
                           regularizer=slim.l2_regularizer(0.05),
-                          device='/CPU:0')
+                          device=DEVICE)
         return slim.math_ops.mul(inputs,scales)
 
 def leaky_relu(inputs):
