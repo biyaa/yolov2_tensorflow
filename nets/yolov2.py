@@ -57,15 +57,18 @@ def yolo_net(inputs):
 
 
         #print layer29[:,:,:,:,0:4]
-        layer30 = slim.nn.sigmoid(layer29[:,:,:,:,0:5],name="coords_scale_exp")
+        layer30 = slim.nn.sigmoid(layer29[:,:,:,:,0:2],name="coords_xy")
+        layer31 = slim.math_ops.exp(layer29[:,:,:,:,2:4],name="coords_wh")
+        layer32 = slim.nn.sigmoid(layer29[:,:,:,:,4:5],name="scale")
+        layer32 = slim.array_ops.reshape(layer32,[1,13,13,5,1],name="scale")
 
         layer40 = tf.reduce_max(layer29[:,:,:,:,5:],4,name="max_class")
         layer41 = slim.array_ops.reshape(layer40,[1,13,13,5,1],"reshape_max")
         layer42 = slim.math_ops.sub(layer29[:,:,:,:,5:],layer41,name="sub_max")
         layer43 = slim.nn.softmax(layer42,name="class_softmax")
 
-        layer50 = slim.array_ops.concat(4,[layer30,layer43])
-        print layer30
+        layer50 = slim.array_ops.concat(4,[layer30,layer31,layer32,layer43])
+        print layer32
         print layer43
         
         return layer50

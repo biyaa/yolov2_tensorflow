@@ -24,7 +24,7 @@ print net
 init = tf.global_variables_initializer()
 with tf.Session() as sess:
     sess.run(init)
-    print sess.run(net)
+    sess.run(net)
 all_var = yolo.slim.get_model_variables()
 for v in all_var:                        
        print  v.name ,v.get_shape()

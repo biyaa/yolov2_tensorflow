@@ -6,8 +6,6 @@ import cv2
 import config.config as cfg
 from utils.timer import Timer
 slim = tf.contrib.slim
-def logistic_activate(x):
-    return 1./(1. + np.exp(-x))
 
 def get_region_box(boxes,i,j,n,anchors):
     box=np.zeros((4),dtype=np.float32)
@@ -16,19 +14,8 @@ def get_region_box(boxes,i,j,n,anchors):
     #box[2] = (0.5 * logistic_activate(boxes[i,j,n,2]))/cfg.cell_size
     #box[3] = (0.5 * logistic_activate(boxes[i,j,n,3]))/cfg.cell_size
     box[2] = (anchors[2*n] * boxes[i,j,n,2])/cfg.cell_size
-    box[3] = (anchors[2*n] * boxes[i,j,n,3])/cfg.cell_size
+    box[3] = (anchors[2*n+1] * boxes[i,j,n,3])/cfg.cell_size
     return box
-
-def iou(box1, box2):
-    tb = min(box1[0] + 0.5 * box1[2], box2[0] + 0.5 * box2[2]) - \
-        max(box1[0] - 0.5 * box1[2], box2[0] - 0.5 * box2[2])
-    lr = min(box1[1] + 0.5 * box1[3], box2[1] + 0.5 * box2[3]) - \
-        max(box1[1] - 0.5 * box1[3], box2[1] - 0.5 * box2[3])
-    if tb < 0 or lr < 0:
-        intersection = 0
-    else:
-        intersection = tb * lr
-    return intersection / (box1[2] * box1[3] + box2[2] * box2[3] - intersection)
     
     
 def interpret_output(output):
@@ -47,52 +34,42 @@ def interpret_output(output):
 
     boxes = output[:,:,:,:cfg.coords]
 
-    for i in xrange(cfg.cell_size):
-        for j in xrange(cfg.cell_size):
+    for row in xrange(cfg.cell_size):
+        for col in xrange(cfg.cell_size):
             for n in xrange(cfg.boxes_per_cell):
-                boxes[i,j,n] = get_region_box(boxes,i,j,n,cfg.anchors)
+                boxes[row,col,n] = get_region_box(boxes,col,row,n,cfg.anchors)
 
     #boxes *= cfg.image_size
+    print "box",boxes.shape
 
-    for i in range(cfg.boxes_per_cell):
-        for j in range(cfg.num_class):
-            probs[:, :, i, j] = np.multiply(
-                class_probs[:, :, i,j], scales[:, :, i])
+    probs = class_probs * scales[:,:,:,np.newaxis]
 
-    filter_mat_probs = np.array(probs >= cfg.threshold, dtype='bool')
-    filter_mat_boxes = np.nonzero(filter_mat_probs)
-    boxes_filtered = boxes[filter_mat_boxes[0],
-                           filter_mat_boxes[1], filter_mat_boxes[2]]
-    probs_filtered = probs[filter_mat_probs]
-    classes_num_filtered = np.argmax(filter_mat_probs, axis=3)[filter_mat_boxes[
-        0], filter_mat_boxes[1], filter_mat_boxes[2]]
+    print "probs",probs.shape
+    probs[probs < cfg.threshold] =0
+    probs_max = np.max(probs,3)
+    probs_max_index = np.argmax(probs,3)
 
-    argsort = np.array(np.argsort(probs_filtered))[::-1]
-    boxes_filtered = boxes_filtered[argsort]
-    probs_filtered = probs_filtered[argsort]
-    classes_num_filtered = classes_num_filtered[argsort]
-
-    for i in range(len(boxes_filtered)):
-        if probs_filtered[i] == 0:
-            continue
-        for j in range(i + 1, len(boxes_filtered)):
-            if iou(boxes_filtered[i], boxes_filtered[j]) > cfg.iou_threshold:
-                probs_filtered[j] = 0.0
-
-    filter_iou = np.array(probs_filtered > 0.0, dtype='bool')
-    boxes_filtered = boxes_filtered[filter_iou]
-    probs_filtered = probs_filtered[filter_iou]
-    classes_num_filtered = classes_num_filtered[filter_iou]
+    #filter_mat_probs = np.array(probs >= cfg.threshold, dtype='bool')
+    probs_mask = np.where(probs_max >= cfg.threshold)
+    #filter_mat_boxes = np.nonzero(filter_mat_probs)
+    probs_masked = probs_max[probs_mask]
+    probs_index_masked = probs_max_index[probs_mask]
+    boxes_masked = boxes[probs_mask]
+    print probs_mask
+    
 
     result = []
-    for i in range(len(boxes_filtered)):
-        result.append([cfg.cls[classes_num_filtered[i]], boxes_filtered[i][0], boxes_filtered[
-                      i][1], boxes_filtered[i][2], boxes_filtered[i][3], probs_filtered[i]])
+    result_num = len(probs_mask[0]) if len(probs_mask)>0 else 0
+    print "num",result_num
+
+    for i in range(result_num):
+        result.append([cfg.cls[probs_index_masked[i]], boxes_masked[i][0], boxes_masked[
+                      i][1], boxes_masked[i][2], boxes_masked[i][3], probs_masked[i]*100])
 
     return result
 
 def detect_from_cvmat(inputs):
-    print "inputs:",inputs
+    #print "inputs:",inputs
     net = yolo.yolo_net(inputs)
     init = tf.global_variables_initializer()
     with tf.Session() as sess:
@@ -122,24 +99,31 @@ def detect(img):
     result = detect_from_cvmat(inputs)[0]
 
     for i in range(len(result)):
-        result[i][1] *= (1.0 * img_w / cfg.image_size)
-        result[i][2] *= (1.0 * img_h / cfg.image_size)
-        result[i][3] *= (1.0 * img_w / cfg.image_size)
-        result[i][4] *= (1.0 * img_h / cfg.image_size)
+        left = (result[i][1] - result[i][3]/2)*img_w
+        right = (result[i][1] + result[i][3]/2)*img_w
+        top = (result[i][2] - result[i][4]/2)*img_h
+        bot = (result[i][2] + result[i][4]/2)*img_h
+        result[i][1] = left if left>0 else 0
+        result[i][2] = right if right<img_w-1 else img_w-1
+        result[i][3] = top if top>0 else 0
+        result[i][4] = bot if bot<img_h-1 else img_h-1
 
     print "result:", result
     return result
 
 def draw_result(img, result):
     for i in range(len(result)):
-        x = int(result[i][1])
-        y = int(result[i][2])
-        w = int(result[i][3] / 2)
-        h = int(result[i][4] / 2)
-        cv2.rectangle(img, (x - w, y - h), (x + w, y + h), (0, 255, 0), 2)
-        cv2.rectangle(img, (x - w, y - h - 20),
-                      (x + w, y - h), (125, 125, 125), -1)
-        cv2.putText(img, result[i][0] + ' : %.2f' % result[i][5], (x - w + 5, y - h - 7), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.CV_AA)
+        left = int(result[i][1])
+        right = int(result[i][2])
+        top = int(result[i][3])
+        bot = int(result[i][4])
+        c = i%3
+        color = 200*(c==0), 200*(c==1), 200*(c==2)
+        cv2.rectangle(img, (left, top), (right, bot), (color), 5)
+        cv2.rectangle(img, (left, top + 20),
+                      (right, top+1), (color), -1)
+        cv2.putText(img, result[i][0] + ' : %.2f' % result[i][5], (left+ 15, top -7 + 20), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255), 1, cv2.CV_AA)
+
 def image_detector(imname, wait=0):
     print imname
     detect_timer = Timer()
@@ -151,6 +135,7 @@ def image_detector(imname, wait=0):
     print 'Average detecting time: {:.3f}s'.format(detect_timer.average_time)
 
     draw_result(image, result)
+    cv2.imwrite('prediction.jpg', image)
     cv2.imshow('Image', image)
     cv2.waitKey(wait)
 
