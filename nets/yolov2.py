@@ -93,13 +93,14 @@ def conv2d(inputs,filters,kernel_size,stride,padding,scope):
                       activation_fn=None,
                       normalizer_fn=slim.batch_norm,
                       normalizer_params={
-                          'decay':0.0005,
+                          'scale':True,
+                          'center':False,
                           },
                       weights_initializer=tf.truncated_normal_initializer(0.0, 0.01),
                       weights_regularizer=slim.l2_regularizer(0.0005)):
         part1 = slim.conv2d(inputs, filters, kernel_size, stride, padding='SAME', scope=scope)
-        part2 = scale_bias(part1,scope=scope)
-        part3 = slim.bias_add(part2,scope=scope)
+        #part2 = scale_bias(part1,scope=scope)
+        part3 = slim.bias_add(part1,scope=scope)
         part4 = leaky_relu(part3)
         return part4
 
