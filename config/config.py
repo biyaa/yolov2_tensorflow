@@ -12,7 +12,7 @@ image_size = 416
 
 
 test_path = 'test'
-test_img = os.path.join(test_path, 'scream.jpg')
+test_img = os.path.join(test_path, 'cat.jpg')
 cell_size = 13
 num_class = 80
 boxes_per_cell = 5

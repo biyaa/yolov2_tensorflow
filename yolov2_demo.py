@@ -37,6 +37,11 @@ def interpret_output(output):
     #scales = np.reshape(output[:,:,:,cfg.coords], ( cfg.cell_size, cfg.cell_size,cfg.boxes_per_cell, cfg.scale))
     scales = np.zeros((cfg.cell_size, cfg.cell_size,cfg.boxes_per_cell),dtype=np.float32)
     scales = output[:,:,:,cfg.coords]
+    print "probs",probs.shape
+
+    probs = class_probs * scales[:,:,:,np.newaxis]
+    print probs[probs>0.5]
+    print np.where(probs>0.5)
 
     #offset = np.transpose(np.reshape(np.array([np.arange(self.cell_size)] * self.cell_size * self.boxes_per_cell), (self.boxes_per_cell, self.cell_size, self.cell_size)), (1, 2, 0))
 
@@ -47,9 +52,6 @@ def interpret_output(output):
             for n in xrange(cfg.boxes_per_cell):
                 boxes[row,col,n] = get_region_box(boxes,col,row,n,cfg.anchors)
 
-    print "box",boxes.shape
-
-    probs = class_probs * scales[:,:,:,np.newaxis]
     filter_mat_probs = np.array(probs>=cfg.threshold,dtype='bool')
     filter_mat_boxes = np.nonzero(filter_mat_probs)
     boxes_filtered = boxes[filter_mat_boxes[0],filter_mat_boxes[1],filter_mat_boxes[2]]
