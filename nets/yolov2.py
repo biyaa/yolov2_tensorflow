@@ -74,7 +74,7 @@ def yolo_net(inputs):
         
         return layer50
 
-def reorg(inputs,shape):
+def reorg_bak(inputs,shape):
     print inputs
     #body = lambda x:
     inputs = slim.array_ops.transpose(inputs,perm=[0,3,1,2])
@@ -86,6 +86,17 @@ def reorg(inputs,shape):
     return slim.array_ops.reshape(output,shape)
     
 
+def reorg(inputs,shape):
+    print inputs
+    output = tf.Variable(tf.zeros([1,52,52,128],tf.float32))
+
+    output[:,::2,::2,:].assign(inputs[:,:,:,0:128])
+    output[:,::2,1::2,:].assign(inputs[:,:,:,128:256])
+    output[:,1::2,::2,:].assign(inputs[:,:,:,256:384])
+    output[:,1::2,1::2,:].assign(inputs[:,:,:,384:512])
+    print output
+
+    return slim.array_ops.reshape(output,shape)
 
 
 def conv2d(inputs,filters,kernel_size,stride,padding,scope):
