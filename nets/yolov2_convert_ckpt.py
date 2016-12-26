@@ -17,8 +17,7 @@ DARK_TO_TF ={
         'weights':'weights',
         'BatchNorm/moving_mean':'rolling_mean',
         'BatchNorm/moving_variance':'rolling_variance',
-        'BatchNorm/scales':'scales',
-        'BatchNorm/beta':'beta',
+        'BatchNorm/gamma':'scales',
         'biases':'biases'
         }
 
@@ -68,8 +67,6 @@ def get_data_from_txt(id,darknet_varname,shape):
     if darknet_varname == "scales":
         val = np.array(data['scales']).astype('float32')
     
-    if darknet_varname == "beta":
-        val = np.zeros(shape,dtype=np.float32)
     val = np.reshape(val,shape)
     print "val:",val.shape
     return val
