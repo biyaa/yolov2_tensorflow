@@ -9,10 +9,10 @@ data_path = 'data'
 pascal_path = os.path.join(data_path, 'pascal_voc')
 
 image_size = 416
-
+batch_size = 1
 
 test_path = 'test'
-test_img = os.path.join(test_path, 'horses.jpg')
+test_img = os.path.join(test_path, 'person.jpg')
 cell_size = 13
 num_class = 80
 boxes_per_cell = 5

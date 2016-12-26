@@ -19,7 +19,7 @@ def read_txt_data(path,filename):
 
 #inputs = np.array(data,dtype=np.float32)
 inputs = np.ones((1,416,416,3),dtype=np.float32)
-net = yolo.yolo_net(inputs)
+net = yolo.yolo_net(inputs,1)
 print net
 init = tf.global_variables_initializer()
 with tf.Session() as sess:

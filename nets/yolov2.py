@@ -21,7 +21,7 @@ _reorg_module = tf.load_op_library(
                                 'core/re_org.so'))
 reorg_func = _reorg_module.re_org
 #def cond_cls_region(
-def yolo_net(inputs):
+def yolo_net(inputs,batch_size):
         layer0 = conv2d(inputs, 32, [3, 3], 1, padding='SAME', scope='conv0')
         layer1 = slim.max_pool2d(layer0, [2, 2], scope='pool1')
         layer2 = conv2d(layer1, 64, [3, 3], 1, padding='SAME', scope='conv2')
@@ -48,23 +48,20 @@ def yolo_net(inputs):
         layer23 = conv2d(layer22, 1024, [3, 3], 1, padding='SAME', scope='conv23')
         layer24 = conv2d(layer23, 1024, [3, 3], 1, padding='SAME', scope='conv24')
         layer25 = layer16
-        #layer26 = slim.array_ops.reshape(layer25,shape=(1,13,13,2048))
-        layer26 = reorg(layer25,(1,13,13,2048))
+        layer26 = reorg(layer25,(batch_size,13,13,2048))
         layer27 = slim.array_ops.concat(3,[layer26,layer24])
         layer28 = conv2d(layer27, 1024, [3, 3], 1, padding='SAME', scope='conv28')
         layer29 = conv2d_with_linear(layer28, 425, [1, 1], 1, padding='SAME', scope='conv29')
-        layer29 = slim.array_ops.reshape(layer29,[1,13,13,5,85])
+        layer29 = slim.array_ops.reshape(layer29,[batch_size,13,13,5,85])
         #print layer29
 
 
-        #print layer29[:,:,:,:,0:4]
         layer30 = slim.nn.sigmoid(layer29[:,:,:,:,0:2],name="coords_xy")
         layer31 = slim.math_ops.exp(layer29[:,:,:,:,2:4],name="coords_wh")
         layer32 = slim.nn.sigmoid(layer29[:,:,:,:,4:5],name="scale")
-        layer32 = slim.array_ops.reshape(layer32,[1,13,13,5,1],name="scale")
 
         layer40 = tf.reduce_max(layer29[:,:,:,:,5:],4,name="max_class")
-        layer41 = slim.array_ops.reshape(layer40,[1,13,13,5,1],"reshape_max")
+        layer41 = slim.array_ops.expand_dims(layer40,-1,name="scale")
         layer42 = slim.math_ops.sub(layer29[:,:,:,:,5:],layer41,name="sub_max")
         layer43 = slim.nn.softmax(layer42,name="class_softmax")
 
@@ -87,14 +84,13 @@ def reorg_bak(inputs,shape):
     
 
 def reorg(inputs,shape):
-    print inputs
-    output = tf.Variable(tf.zeros([1,52,52,128],tf.float32))
+    output = tf.Variable(tf.zeros([shape[0],52,52,128],tf.float32))
 
     output[:,::2,::2,:].assign(inputs[:,:,:,0:128])
     output[:,::2,1::2,:].assign(inputs[:,:,:,128:256])
     output[:,1::2,::2,:].assign(inputs[:,:,:,256:384])
     output[:,1::2,1::2,:].assign(inputs[:,:,:,384:512])
-    print output
+    #print output
 
     return slim.array_ops.reshape(output,shape)
 

@@ -104,7 +104,7 @@ def interpret_output(output):
 
 def detect_from_cvmat(inputs):
     #print "inputs:",inputs
-    net = yolo.yolo_net(inputs)
+    net = yolo.yolo_net(inputs,1)
     init = tf.global_variables_initializer()
     with tf.Session() as sess:
         sess.run(init)
