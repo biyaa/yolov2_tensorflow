@@ -108,7 +108,7 @@ def detect_from_cvmat(inputs):
     init = tf.global_variables_initializer()
     with tf.Session() as sess:
         sess.run(init)
-        saver = tf.train.Saver(tf.global_variables())
+        saver = tf.train.Saver(slim.get_model_variables())
         #saver.save(sess,OUT_FILE)
         saver.restore(sess, cfg.out_file)
         print "weights restore."
