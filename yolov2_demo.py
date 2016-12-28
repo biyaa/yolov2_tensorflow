@@ -17,12 +17,15 @@ slim = tf.contrib.slim
 
 def get_region_box(boxes,i,j,n,anchors):
     box=np.zeros((4),dtype=np.float32)
-    box[0] = (i + boxes[i,j,n,0])/cfg.cell_size
-    box[1] = (j + boxes[i,j,n,1])/cfg.cell_size
-    #box[2] = (0.5 * logistic_activate(boxes[i,j,n,2]))/cfg.cell_size
-    #box[3] = (0.5 * logistic_activate(boxes[i,j,n,3]))/cfg.cell_size
-    box[2] = (anchors[2*n] * boxes[i,j,n,2])/cfg.cell_size
-    box[3] = (anchors[2*n+1] * boxes[i,j,n,3])/cfg.cell_size
+    #box[0] = (i + boxes[i,j,n,0])/cfg.cell_size
+    #box[1] = (j + boxes[i,j,n,1])/cfg.cell_size
+    #box[2] = (anchors[2*n] * boxes[i,j,n,2])/cfg.cell_size
+    #box[3] = (anchors[2*n+1] * boxes[i,j,n,3])/cfg.cell_size
+    
+    box[0] = boxes[i,j,n,0]
+    box[1] = boxes[i,j,n,1]
+    box[2] = anchors[2*n] * boxes[i,j,n,2]
+    box[3] = anchors[2*n+1] * boxes[i,j,n,3]
     return box
     
     

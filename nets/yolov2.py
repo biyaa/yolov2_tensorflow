@@ -57,19 +57,40 @@ def yolo_net(inputs,batch_size):
 
 
         layer30 = slim.nn.sigmoid(layer29[:,:,:,:,0:2],name="coords_xy")
-        layer31 = slim.math_ops.exp(layer29[:,:,:,:,2:4],name="coords_wh")
-        layer32 = slim.nn.sigmoid(layer29[:,:,:,:,4:5],name="scale")
+        # (x + col)/w
+        layer31 = xy_add_cr_div_size(layer29[:,:,:,:,0:1],2,13,name="x_add_col_div_size")
+        # (y + row)/h
+        layer32 = xy_add_cr_div_size(layer29[:,:,:,:,1:2],1,13,name="x_add_row_div_size")
+        layer33 = slim.math_ops.exp(layer29[:,:,:,:,2:4],name="coords_wh")
+        layer33 = layer33 / 13
+        layer34 = slim.nn.sigmoid(layer29[:,:,:,:,4:5],name="scale")
 
         layer40 = tf.reduce_max(layer29[:,:,:,:,5:],4,name="max_class")
         layer41 = slim.array_ops.expand_dims(layer40,-1,name="scale")
         layer42 = slim.math_ops.sub(layer29[:,:,:,:,5:],layer41,name="sub_max")
         layer43 = slim.nn.softmax(layer42,name="class_softmax")
 
-        layer50 = slim.array_ops.concat(4,[layer30,layer31,layer32,layer43])
-        print layer32
+        layer50 = slim.array_ops.concat(4,[layer31,layer32,layer33,layer34,layer43])
+        print layer34
         print layer43
         
         return layer50
+
+def xy_add_cr_div_size(inputs,cr,cell_size,name):
+    shape = inputs.get_shape()
+    #print shape
+    addn = slim.array_ops.where(inputs>-999999)
+    addn = addn[...,cr]
+    addn = slim.array_ops.expand_dims(addn,-1)
+    addn = tf.to_float(addn)
+    #print addn
+    inputs = slim.array_ops.reshape(inputs,[shape[0].value,-1,1])
+    inputs = inputs + addn 
+    inputs = inputs / cell_size 
+    #print inputs
+    return slim.array_ops.reshape(inputs,shape)
+
+
 
 def reorg_bak(inputs,shape):
     print inputs
