@@ -75,7 +75,7 @@ def get_data_from_txt(id,darknet_varname,shape):
 
 #init = tf.global_variables_initializer
 inputs = np.ones((1,416,416,3),dtype=np.float32)
-net = yolo.yolo_net(inputs)
+net = yolo.yolo_net(inputs,1)
 #print net
 all_var = yolo.slim.get_model_variables()
 with tf.Session() as sess:
@@ -89,7 +89,7 @@ with tf.Session() as sess:
         sess.run(v.assign(value))
         print v
 
-    saver = tf.train.Saver(tf.global_variables())
+    saver = tf.train.Saver(yolo.slim.get_model_variables())
     saver.save(sess,OUT_FILE)
     print 'It has convertted from txt to tf-ckpt file!'
 

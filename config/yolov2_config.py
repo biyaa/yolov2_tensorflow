@@ -4,12 +4,9 @@ import numpy as np
 # path and dataset parameter
 #
 
-data_path = 'data'
-
-pascal_path = os.path.join(data_path, 'pascal_voc')
-
+train_data_path='/mnt/disk1/darknet/train.txt'
 image_size = 416
-batch_size = 1
+batch_size = 8
 
 test_path = 'test'
 test_img = os.path.join(test_path, 'person.jpg')

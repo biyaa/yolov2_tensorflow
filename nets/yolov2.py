@@ -14,12 +14,12 @@ slim =  tf.contrib.slim
 # 4. 解决 reorg 问题 自定义op实现重组逻辑
 DATA_FORMAT_NCHW = 'NCHW'
 DATA_FORMAT_NHWC = 'NHWC'
-DEVICE ='/CPU:0'
+DEVICE ='/GPU:0'
 ALPHA = 0.1
-_reorg_module = tf.load_op_library(
-            os.path.join(tf.resource_loader.get_data_files_path(),
-                                'core/re_org.so'))
-reorg_func = _reorg_module.re_org
+#_reorg_module = tf.load_op_library(
+            #os.path.join(tf.resource_loader.get_data_files_path(),
+                                #'core/re_org.so'))
+#reorg_func = _reorg_module.re_org
 #def cond_cls_region(
 def yolo_net(inputs,batch_size):
         layer0 = conv2d(inputs, 32, [3, 3], 1, padding='SAME', scope='conv0')
@@ -102,9 +102,9 @@ def conv2d(inputs,filters,kernel_size,stride,padding,scope):
                       normalizer_params={
                           'scale':True,
                           'center':False,
+                          'epsilon':.0000001
                           },
-                      weights_initializer=tf.truncated_normal_initializer(0.0, 0.01),
-                      weights_regularizer=slim.l2_regularizer(0.0005)):
+                      weights_initializer=tf.constant_initializer(0)):
         part1 = slim.conv2d(inputs, filters, kernel_size, stride, padding='SAME', scope=scope)
         #part2 = scale_bias(part1,scope=scope)
         part3 = slim.bias_add(part1,scope=scope)
@@ -115,10 +115,8 @@ def conv2d_with_linear(inputs,filters,kernel_size,stride,padding,scope):
     with slim.arg_scope([slim.conv2d],
                       activation_fn=None,
                       normalizer_fn=None,
-                      weights_initializer=tf.truncated_normal_initializer(0.0, 0.01),
-                      weights_regularizer=slim.l2_regularizer(0.0005),
-                      biases_initializer=tf.truncated_normal_initializer(0.0, 0.01),
-                      biases_regularizer=slim.l2_regularizer(0.0005)):
+                      weights_initializer=tf.constant_initializer(0),
+                      biases_initializer=tf.constant_initializer(0)):
         part1 = slim.conv2d(inputs, filters, kernel_size, stride, padding='SAME', scope=scope)
         return part1
 #data_format="NCHW",
@@ -131,8 +129,7 @@ def scale_bias(inputs,data_format=DATA_FORMAT_NHWC,scope='BatchNorm'):
           raise ValueError('`C` dimension must be known but is None')
         scales = slim.model_variable('scales',
                           shape=[num_features,],
-                          initializer=tf.truncated_normal_initializer(stddev=0.1),
-                          regularizer=slim.l2_regularizer(0.05),
+                          initializer=tf.constant_initializer(0),
                           device=DEVICE)
         return slim.math_ops.mul(inputs,scales)
 

@@ -5,12 +5,12 @@ Created on Thu Dec 22 18:07:21 2016
 @author: huangguoxiong
 """
 
-import tensorflow as tf
-import numpy as np
-import nets.yolov2 as yolo
 import os
 import cv2
-import config.config as cfg
+import numpy as np
+import tensorflow as tf
+import nets.yolov2 as yolo
+import config.yolov2_config as cfg
 import utils.box as box
 from utils.timer import Timer
 slim = tf.contrib.slim
@@ -106,19 +106,38 @@ def detect_from_cvmat(inputs):
     #print "inputs:",inputs
     net = yolo.yolo_net(inputs,1)
     init = tf.global_variables_initializer()
-    with tf.Session() as sess:
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    config.log_device_placement = False
+    init_T = Timer()
+    init_T.tic()
+    with tf.Session(config=config) as sess:
         sess.run(init)
         saver = tf.train.Saver(slim.get_model_variables())
         #saver.save(sess,OUT_FILE)
+        
+        init_T.toc()
+        print init_T.average_time
+        restore_T = Timer()
+        restore_T.tic()
         saver.restore(sess, cfg.out_file)
         print "weights restore."
+        restore_T.toc()
+        print restore_T.average_time
+        run_T = Timer()
+        run_T.tic()
         net_output = sess.run(net)
-        print "net_output:",net_output.shape
         print "net_output:",net_output.shape[0]
+        run_T.toc()
+        print run_T.average_time
     results = []
+    itp_T = Timer()
+    itp_T.tic()
     for i in range(net_output.shape[0]):
         results.append(interpret_output(net_output[i]))
 
+    itp_T.toc()
+    print itp_T.average_time
     return results
 
 def detect(img):
