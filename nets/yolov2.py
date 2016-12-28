@@ -102,6 +102,7 @@ def conv2d(inputs,filters,kernel_size,stride,padding,scope):
                       normalizer_params={
                           'scale':True,
                           'center':False,
+                          'epsilon':.0000001
                           },
                       weights_initializer=tf.truncated_normal_initializer(0.0, 0.01),
                       weights_regularizer=slim.l2_regularizer(0.0005)):
