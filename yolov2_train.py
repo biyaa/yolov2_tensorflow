@@ -18,8 +18,8 @@ voc.set_config(cfg)
 
 
 # Load the images and labels.
-images, labels = voc.get_next_batch()
-print images.shape[0]
+#images, labels = voc.get_next_batch()
+#print images.shape[0]
 ## Create the model.
 #scene_predictions, depth_predictions, pose_predictions = CreateMultiTaskModel(images)
 #
@@ -54,18 +54,23 @@ def tf_post_precess(images,batch):
     t_index = tf.where(t_x>-99999)
     t_row = tf.reshape(tf.to_float(t_index[:,1:2]),t_x.get_shape())
     t_col = tf.reshape(tf.to_float(t_index[:,2:3]),t_x.get_shape())
-    t_b = tf.reshape(t_index[:,3:4],t_x.get_shape())
+    #t_b = tf.reshape(t_index[:,3:4],t_x.get_shape())
 
     t_x = (t_col + tf.sigmoid(t_x)) /cfg.cell_size
     t_y = (t_row + tf.sigmoid(t_y)) /cfg.cell_size
     
+    t_c = tf.sigmoid(t_c)
     #print tf.tile(cfg.anchors[::2],[13*13]) 
     t_w = tf.exp(t_w) * cfg.anchors[::2]/ cfg.cell_size
     t_h = tf.exp(t_h) * cfg.anchors[1::2]/ cfg.cell_size
     t_w = tf.expand_dims(t_w,-1)
     t_h = tf.expand_dims(t_h,-1)
 
-    t_probs = t_classes * t_c
+    t_cls_max = tf.reduce_max(t_classes,-1,True)
+    t_classes = t_classes - t_cls_max
+    t_classes = tf.nn.softmax(t_classes)
+
+    #t_probs = t_classes * t_c
     print t_w
     print t_h
     return tf.concat(4,[t_x,t_y,t_w,t_h,t_c,t_classes])

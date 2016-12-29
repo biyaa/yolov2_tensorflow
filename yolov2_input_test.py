@@ -11,15 +11,16 @@ import cv2
 import numpy as np
 import tensorflow as tf
 import config.yolov2_config as cfg
-import utils.pascal_voc as voc
+#import utils.pascal_voc as voc
 import yolov2_train as train
 from utils.timer import Timer
-voc.set_config(cfg)
+slim = tf.contrib.slim
+#voc.set_config(cfg)
 #voc.print_config()
 
 # Load the images and labels.
 #voc._get_train_paths()
-voc.get_next_batch()
+#voc.get_next_batch()
 #voc.read_file()
 ## Create the model.
 #scene_predictions, depth_predictions, pose_predictions = CreateMultiTaskModel(images)
@@ -65,7 +66,15 @@ with tf.Session(config=config) as sess:
     run_T = Timer()
     run_T.tic()
     net_output = sess.run(net)
-    print "net_output:",net_output.shape[0]
+    out = net_output[...,5:] * net_output[...,4:5]
+    #print net_output[...,5:]
+    #print net_output[...,4:5]
+    out[out<cfg.threshold] =0
+    out_m = np.max(out,4)    
+    out_i = np.argmax(out,4)
+    #print out_m
+    print "net_output:",out_i [out_m > cfg.threshold]
+    print "net_output:",out_m [out_m > cfg.threshold]
     run_T.toc()
     print run_T.average_time
 
