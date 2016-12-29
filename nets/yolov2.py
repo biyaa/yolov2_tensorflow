@@ -106,7 +106,9 @@ def conv2d(inputs,filters,kernel_size,stride,padding,scope):
                           },
                       weights_initializer=tf.truncated_normal_initializer(0.0, 0.01),
                       weights_regularizer=slim.l2_regularizer(0.0005)):
-        part1 = slim.conv2d(inputs, filters, kernel_size, stride, padding='SAME', scope=scope)
+        pad = [[(kernel_size[0]-1)/2,(kernel_size[1]-1) / 2]] * 2
+        inputs = tf.pad(inputs,[[0,0]]+pad+[[0,0]],"CONSTANT")
+        part1 = slim.conv2d(inputs, filters, kernel_size, stride, padding='VALID', scope=scope)
         #part2 = scale_bias(part1,scope=scope)
         part3 = slim.bias_add(part1,scope=scope)
         part4 = leaky_relu(part3)
@@ -120,7 +122,9 @@ def conv2d_with_linear(inputs,filters,kernel_size,stride,padding,scope):
                       weights_regularizer=slim.l2_regularizer(0.0005),
                       biases_initializer=tf.truncated_normal_initializer(0.0, 0.01),
                       biases_regularizer=slim.l2_regularizer(0.0005)):
-        part1 = slim.conv2d(inputs, filters, kernel_size, stride, padding='SAME', scope=scope)
+        pad = [[(kernel_size[0]-1)/2,(kernel_size[1]-1) / 2]] * 2
+        inputs = tf.pad(inputs,[[0,0]]+pad+[[0,0]],"CONSTANT")
+        part1 = slim.conv2d(inputs, filters, kernel_size, stride, padding='VALID', scope=scope)
         return part1
 #data_format="NCHW",
 def scale_bias(inputs,data_format=DATA_FORMAT_NHWC,scope='BatchNorm'):
