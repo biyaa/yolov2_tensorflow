@@ -7,11 +7,13 @@
     copyright: (c) 2016 by huangguoxiong.
     license: Apache license, see LICENSE for more details.
 """
-
+import cv2
+import numpy as np
 import tensorflow as tf
 import config.yolov2_config as cfg
 import utils.pascal_voc as voc
-
+import yolov2_train as train
+from utils.timer import Timer
 voc.set_config(cfg)
 #voc.print_config()
 
@@ -34,3 +36,36 @@ voc.get_next_batch()
 #
 ## (Regularization Loss is included in the total loss by default).
 #total_loss2 = losses.get_total_loss()
+img = cv2.imread(cfg.test_img,1)
+inputs = cv2.resize(img, (cfg.image_size, cfg.image_size)).astype(np.float32)
+inputs = cv2.cvtColor(inputs, cv2.COLOR_BGR2RGB).astype(np.float32)
+inputs = (inputs / 255.0) 
+inputs = np.reshape(inputs, (1, cfg.image_size, cfg.image_size, 3))
+
+net = train.tf_post_precess(inputs,1)
+init = tf.global_variables_initializer()
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+config.log_device_placement = False
+init_T = Timer()
+init_T.tic()
+with tf.Session(config=config) as sess:
+    sess.run(init)
+    saver = tf.train.Saver(slim.get_model_variables())
+    #saver.save(sess,OUT_FILE)
+    
+    init_T.toc()
+    print init_T.average_time
+    restore_T = Timer()
+    restore_T.tic()
+    saver.restore(sess, cfg.out_file)
+    print "weights restore."
+    restore_T.toc()
+    print restore_T.average_time
+    run_T = Timer()
+    run_T.tic()
+    net_output = sess.run(net)
+    print "net_output:",net_output.shape[0]
+    run_T.toc()
+    print run_T.average_time
+
