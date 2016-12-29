@@ -14,7 +14,7 @@ slim =  tf.contrib.slim
 # 4. 解决 reorg 问题 自定义op实现重组逻辑
 DATA_FORMAT_NCHW = 'NCHW'
 DATA_FORMAT_NHWC = 'NHWC'
-DEVICE ='/GPU:0'
+DEVICE ='/CPU:0'
 ALPHA = 0.1
 #_reorg_module = tf.load_op_library(
             #os.path.join(tf.resource_loader.get_data_files_path(),
@@ -58,9 +58,9 @@ def yolo_net(inputs,batch_size):
 
         layer30 = slim.nn.sigmoid(layer29[:,:,:,:,0:2],name="coords_xy")
         # (x + col)/w
-        layer31 = xy_add_cr_div_size(layer29[:,:,:,:,0:1],2,13,name="x_add_col_div_size")
+        layer31 = xy_add_cr_div_size(layer30[:,:,:,:,0:1],2,13,name="x_add_col_div_size")
         # (y + row)/h
-        layer32 = xy_add_cr_div_size(layer29[:,:,:,:,1:2],1,13,name="x_add_row_div_size")
+        layer32 = xy_add_cr_div_size(layer30[:,:,:,:,1:2],1,13,name="x_add_row_div_size")
         layer33 = slim.math_ops.exp(layer29[:,:,:,:,2:4],name="coords_wh")
         layer33 = layer33 / 13
         layer34 = slim.nn.sigmoid(layer29[:,:,:,:,4:5],name="scale")
@@ -74,7 +74,7 @@ def yolo_net(inputs,batch_size):
         print layer34
         print layer43
         
-        return layer50
+        return layer29
 
 def xy_add_cr_div_size(inputs,cr,cell_size,name):
     shape = inputs.get_shape()
@@ -91,7 +91,19 @@ def xy_add_cr_div_size(inputs,cr,cell_size,name):
     return slim.array_ops.reshape(inputs,shape)
 
 
-
+#def wh_mul_anchor_of_n(inputs,n,anchors,name):
+#    shape = inputs.get_shape()
+#    #print shape
+#    nn = slim.array_ops.where(inputs>-999999)
+#    nn = nn[...,n]
+#    nn = slim.array_ops.expand_dims(nn,-1)
+#    nn = tf.to_float(nn)
+#    #print nn
+#    inputs = slim.array_ops.reshape(inputs,[shape[0].value,-1,1)
+#    inputs = inputs * anchors(2*nnk
+#    inputs = inputs / cell_size 
+#    #print inputs
+#
 def reorg_bak(inputs,shape):
     print inputs
     #body = lambda x:

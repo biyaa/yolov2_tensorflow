@@ -21,7 +21,6 @@ voc.set_config(cfg)
 images, labels = voc.get_next_batch()
 print images.shape[0]
 ## Create the model.
-predict = yolo.yolo_net(images,images.shape[0])
 #scene_predictions, depth_predictions, pose_predictions = CreateMultiTaskModel(images)
 #
 ## Define the loss functions and get the total loss.
@@ -36,3 +35,38 @@ predict = yolo.yolo_net(images,images.shape[0])
 #
 ## (Regularization Loss is included in the total loss by default).
 #total_loss2 = losses.get_total_loss()
+def box_iou():
+    pass
+
+def tf_post_precess(images,batch):
+    predicts = yolo.yolo_net(images,images.shape[0])
+    # 1. x,y,w,h处理
+    # 2. scale处理
+    # 3. class处理
+    t_coords = predicts[...,:5]
+    t_classes = predicts[...,5:]
+    t_x = predicts[...,0:1]
+    t_y = predicts[...,1:2]
+    t_w = predicts[...,2]
+    t_h = predicts[...,3]
+    t_c = predicts[...,4:5] #scale
+    
+    t_index = tf.where(t_x>-99999)
+    t_row = tf.reshape(tf.to_float(t_index[:,1:2]),t_x.get_shape())
+    t_col = tf.reshape(tf.to_float(t_index[:,2:3]),t_x.get_shape())
+    t_b = tf.reshape(t_index[:,3:4],t_x.get_shape())
+
+    t_x = (t_col + tf.sigmoid(t_x)) /cfg.cell_size
+    t_y = (t_row + tf.sigmoid(t_y)) /cfg.cell_size
+    
+    #print tf.tile(cfg.anchors[::2],[13*13]) 
+    t_w = tf.exp(t_w) * cfg.anchors[::2]/ cfg.cell_size
+    t_h = tf.exp(t_h) * cfg.anchors[1::2]/ cfg.cell_size
+    t_w = tf.expand_dims(t_w,-1)
+    t_h = tf.expand_dims(t_h,-1)
+
+    t_probs = t_classes * t_c
+    print t_w
+    print t_h
+    return tf.concat(4,[t_x,t_y,t_w,t_h,t_c,t_classes])
+

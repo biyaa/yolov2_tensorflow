@@ -5,6 +5,10 @@ import numpy as np
 #
 
 train_data_path='/mnt/disk1/darknet/train.txt'
+object_scale=5
+noobject_scale=1
+class_scale=1
+coord_scale=1
 image_size = 416
 batch_size = 8
 
