@@ -14,11 +14,11 @@ import utils.pascal_voc as voc
 import nets.yolov2 as yolo
 from utils.timer import Timer
 slim = tf.contrib.slim
-voc.set_config(cfg)
+voc.sep_config(cfg)
 
 
 # Load the images and labels.
-#images, labels = voc.get_next_batch()
+#images, labels = voc.gep_nexp_batch()
 #print images.shape[0]
 ## Create the model.
 #scene_predictions, depth_predictions, pose_predictions = CreateMultiTaskModel(images)
@@ -30,48 +30,77 @@ voc.set_config(cfg)
 #slim.losses.add_loss(pose_loss) # Letting TF-Slim know about the additional loss.
 #
 ## The following two ways to compute the total loss are equivalent:
-#regularization_loss = tf.add_n(slim.losses.get_regularization_losses())
+#regularization_loss = tf.add_n(slim.losses.gep_regularization_losses())
 #total_loss1 = classification_loss + sum_of_squares_loss + pose_loss + regularization_loss
 #
 ## (Regularization Loss is included in the total loss by default).
-#total_loss2 = losses.get_total_loss()
-def box_iou():
-    pass
+#total_loss2 = losses.gep_total_loss()
+def box_iou(preds,truths):
+    # coords
+    p_x = preds[...,0:1]
+    p_y = preds[...,1:2]
+    p_w = preds[...,2]
+    p_h = preds[...,3]
+
+    p_l = p_x - p_w/2
+    p_r = p_x + p_w/2
+    p_t = p_y - p_h/2
+    p_b = p_y + p_h/2
+
+    t_x = truths[...,0:1]
+    t_y = truths[...,1:2]
+    t_w = truths[...,2:3]
+    t_h = truths[...,3:4]
+
+    t_l = t_x - t_w/2
+    t_r = t_x + t_w/2
+    t_t = t_y - t_h/2
+    t_b = t_y + t_h/2
+
+    # box intersection
+    x_w = tf.minimum(t_r - p_r) - tf.maximum(t_l - p_l)
+    x_h = tf.minimum(t_b - p_b) - tf.maximum(t_t - p_t)
+    area_intersction = x_w * x_h
+    area_intersction = tf.maximum(area_intersction,0)
+    
+    # box union
+    area_p = p_w * p_h
+    area_t = t_w * t_h
+    area_union = area_p + area_t - area_intersction
+    return area_intersction/area_union
 
 def tf_post_precess(images,batch):
     predicts = yolo.yolo_net(images,images.shape[0])
     # 1. x,y,w,h处理
     # 2. scale处理
     # 3. class处理
-    t_coords = predicts[...,:5]
-    t_classes = predicts[...,5:]
-    t_x = predicts[...,0:1]
-    t_y = predicts[...,1:2]
-    t_w = predicts[...,2]
-    t_h = predicts[...,3]
-    t_c = predicts[...,4:5] #scale
+    p_coords = predicts[...,:5]
+    p_classes = predicts[...,5:]
+    p_x = predicts[...,0:1]
+    p_y = predicts[...,1:2]
+    p_w = predicts[...,2]
+    p_h = predicts[...,3]
+    p_c = predicts[...,4:5] #scale
     
-    t_index = tf.where(t_x>-99999)
-    t_row = tf.reshape(tf.to_float(t_index[:,1:2]),t_x.get_shape())
-    t_col = tf.reshape(tf.to_float(t_index[:,2:3]),t_x.get_shape())
-    #t_b = tf.reshape(t_index[:,3:4],t_x.get_shape())
+    p_index = tf.where(p_x>-99999)
+    p_row = tf.reshape(tf.to_float(p_index[:,1:2]),p_x.get_shape())
+    p_col = tf.reshape(tf.to_float(p_index[:,2:3]),p_x.get_shape())
+    #p_b = tf.reshape(p_index[:,3:4],p_x.get_shape())
 
-    t_x = (t_col + tf.sigmoid(t_x)) /cfg.cell_size
-    t_y = (t_row + tf.sigmoid(t_y)) /cfg.cell_size
+    p_x = (p_col + tf.sigmoid(p_x)) /cfg.cell_size
+    p_y = (p_row + tf.sigmoid(p_y)) /cfg.cell_size
     
-    t_c = tf.sigmoid(t_c)
+    p_c = tf.sigmoid(p_c)
     #print tf.tile(cfg.anchors[::2],[13*13]) 
-    t_w = tf.exp(t_w) * cfg.anchors[::2]/ cfg.cell_size
-    t_h = tf.exp(t_h) * cfg.anchors[1::2]/ cfg.cell_size
-    t_w = tf.expand_dims(t_w,-1)
-    t_h = tf.expand_dims(t_h,-1)
+    p_w = tf.exp(p_w) * cfg.anchors[::2]/ cfg.cell_size
+    p_h = tf.exp(p_h) * cfg.anchors[1::2]/ cfg.cell_size
+    p_w = tf.expand_dims(p_w,-1)
+    p_h = tf.expand_dims(p_h,-1)
 
-    t_cls_max = tf.reduce_max(t_classes,-1,True)
-    t_classes = t_classes - t_cls_max
-    t_classes = tf.nn.softmax(t_classes)
+    p_cls_max = tf.reduce_max(p_classes,-1,True)
+    p_classes = p_classes - p_cls_max
+    p_classes = tf.nn.softmax(p_classes)
 
-    #t_probs = t_classes * t_c
-    print t_w
-    print t_h
-    return tf.concat(4,[t_x,t_y,t_w,t_h,t_c,t_classes])
+    #p_probs = p_classes * p_c
+    return tf.concat(4,[p_x,p_y,p_w,p_h,p_c,p_classes])
 

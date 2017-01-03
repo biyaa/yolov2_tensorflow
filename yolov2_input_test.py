@@ -11,16 +11,18 @@ import cv2
 import numpy as np
 import tensorflow as tf
 import config.yolov2_config as cfg
-#import utils.pascal_voc as voc
-import yolov2_train as train
+import utils.pascal_voc as voc
+#import yolov2_train as train
 from utils.timer import Timer
 slim = tf.contrib.slim
-#voc.set_config(cfg)
-#voc.print_config()
+voc.set_config(cfg)
+voc.print_config()
 
 # Load the images and labels.
-#voc._get_train_paths()
-#voc.get_next_batch()
+voc._get_train_paths()
+images,labels = voc.get_next_batch()
+print images.shape
+print labels.shape
 #voc.read_file()
 ## Create the model.
 #scene_predictions, depth_predictions, pose_predictions = CreateMultiTaskModel(images)
@@ -37,44 +39,44 @@ slim = tf.contrib.slim
 #
 ## (Regularization Loss is included in the total loss by default).
 #total_loss2 = losses.get_total_loss()
-img = cv2.imread(cfg.test_img,1)
-inputs = cv2.resize(img, (cfg.image_size, cfg.image_size)).astype(np.float32)
-inputs = cv2.cvtColor(inputs, cv2.COLOR_BGR2RGB).astype(np.float32)
-inputs = (inputs / 255.0) 
-inputs = np.reshape(inputs, (1, cfg.image_size, cfg.image_size, 3))
-
-net = train.tf_post_precess(inputs,1)
-init = tf.global_variables_initializer()
-config = tf.ConfigProto()
-config.gpu_options.allow_growth = True
-config.log_device_placement = False
-init_T = Timer()
-init_T.tic()
-with tf.Session(config=config) as sess:
-    sess.run(init)
-    saver = tf.train.Saver(slim.get_model_variables())
-    #saver.save(sess,OUT_FILE)
-    
-    init_T.toc()
-    print init_T.average_time
-    restore_T = Timer()
-    restore_T.tic()
-    saver.restore(sess, cfg.out_file)
-    print "weights restore."
-    restore_T.toc()
-    print restore_T.average_time
-    run_T = Timer()
-    run_T.tic()
-    net_output = sess.run(net)
-    out = net_output[...,5:] * net_output[...,4:5]
-    #print net_output[...,5:]
-    #print net_output[...,4:5]
-    out[out<cfg.threshold] =0
-    out_m = np.max(out,4)    
-    out_i = np.argmax(out,4)
-    #print out_m
-    print "net_output:",out_i [out_m > cfg.threshold]
-    print "net_output:",out_m [out_m > cfg.threshold]
-    run_T.toc()
-    print run_T.average_time
-
+#img = cv2.imread(cfg.test_img,1)
+#inputs = cv2.resize(img, (cfg.image_size, cfg.image_size)).astype(np.float32)
+#inputs = cv2.cvtColor(inputs, cv2.COLOR_BGR2RGB).astype(np.float32)
+#inputs = (inputs / 255.0) 
+#inputs = np.reshape(inputs, (1, cfg.image_size, cfg.image_size, 3))
+#
+#net = train.tf_post_precess(inputs,1)
+#init = tf.global_variables_initializer()
+#config = tf.ConfigProto()
+#config.gpu_options.allow_growth = True
+#config.log_device_placement = False
+#init_T = Timer()
+#init_T.tic()
+#with tf.Session(config=config) as sess:
+#    sess.run(init)
+#    saver = tf.train.Saver(slim.get_model_variables())
+#    #saver.save(sess,OUT_FILE)
+#    
+#    init_T.toc()
+#    print init_T.average_time
+#    restore_T = Timer()
+#    restore_T.tic()
+#    saver.restore(sess, cfg.out_file)
+#    print "weights restore."
+#    restore_T.toc()
+#    print restore_T.average_time
+#    run_T = Timer()
+#    run_T.tic()
+#    net_output = sess.run(net)
+#    out = net_output[...,5:] * net_output[...,4:5]
+#    #print net_output[...,5:]
+#    #print net_output[...,4:5]
+#    out[out<cfg.threshold] =0
+#    out_m = np.max(out,4)    
+#    out_i = np.argmax(out,4)
+#    #print out_m
+#    print "net_output:",out_i [out_m > cfg.threshold]
+#    print "net_output:",out_m [out_m > cfg.threshold]
+#    run_T.toc()
+#    print run_T.average_time
+#

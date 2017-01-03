@@ -48,7 +48,8 @@ def yolo_net(inputs,batch_size):
         layer23 = conv2d(layer22, 1024, [3, 3], 1, padding='SAME', scope='conv23')
         layer24 = conv2d(layer23, 1024, [3, 3], 1, padding='SAME', scope='conv24')
         layer25 = layer16
-        layer26 = reorg(layer25,(batch_size,13,13,2048))
+        #layer26 = reorg(layer25,(batch_size,13,13,2048))
+        layer26 = slim.array_ops.space_to_depth(layer25,2)
         layer27 = slim.array_ops.concat(3,[layer26,layer24])
         layer28 = conv2d(layer27, 1024, [3, 3], 1, padding='SAME', scope='conv28')
         layer29 = conv2d_with_linear(layer28, 425, [1, 1], 1, padding='SAME', scope='conv29')
@@ -117,15 +118,20 @@ def reorg_bak(inputs,shape):
     
 
 def reorg(inputs,shape):
-    output = tf.Variable(tf.zeros([shape[0],52,52,128],tf.float32))
+    #output = tf.Variable(tf.zeros(shape,tf.float32))
+    c = shape[-1]
 
-    output[:,::2,::2,:].assign(inputs[:,:,:,0:128])
-    output[:,::2,1::2,:].assign(inputs[:,:,:,128:256])
-    output[:,1::2,::2,:].assign(inputs[:,:,:,256:384])
-    output[:,1::2,1::2,:].assign(inputs[:,:,:,384:512])
+    output1 = inputs[:,0:4:4,0:4:4,0:6:2]
+    output2 = inputs[:,0:4:4,::4,1::2]
+    output3 = inputs[:,::4,2::4,::2]
+    output4 = inputs[:,::4,2::4,1::2]
+    #output = output[:,:,:,0:s].assign(inputs[:,::2,::2,:])
+    #output = output[:,:,:,s:2*s].assign(inputs[:,::2,1::2,:])
+    #output = output[:,:,:,2*s:3*s].assign(inputs[:,1::2,::2,:])
+    #output = output[:,:,:,3*s:4*s].assign(inputs[:,1::2,1::2,:])
     #print output
 
-    return slim.array_ops.reshape(output,shape)
+    return tf.concat(1,[output1,output2,output3,output4])
 
 
 def conv2d(inputs,filters,kernel_size,stride,padding,scope):

@@ -51,29 +51,33 @@ def read_image(path):
 
 
 def read_label(path):
-    print path
+    #print path
     label = np.loadtxt(path,dtype=np.float32)
     if len(label.shape)<2:
         label = label[np.newaxis,...]
-    label = np.transpose(label,(1,0))
-    print label,label.shape
+    #label = np.transpose(label,(1,0))
+    #temp = label[...,0]
+    #label[...,0] = label[...,4]
+    #label[...,4] = temp
+    #print label,label.shape
 
     return label
 
 
 def get_next_batch():
     images = np.zeros((cfg.batch_size,cfg.image_size,cfg.image_size,3),dtype=np.float32)
-    labels = np.zeros((cfg.batch_size,5,30),dtype=np.float32)
+    labels = np.zeros((cfg.batch_size,30,5),dtype=np.float32)
     # load paths from a file
     _get_train_paths()
 
     for i in xrange(cfg.batch_size):
         path = _get_rand_one_path()
+        #print path
         images[i] = read_image(path[0])
 
         label= read_label(path[1])
-        box_num = label.shape[-1]
-        labels[i,:,0:box_num] = label
+        box_num = label.shape[0]
+        labels[i,0:box_num,:] = label
         #print labels[i].shape
 
     return images,labels

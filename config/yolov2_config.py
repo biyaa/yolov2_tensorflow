@@ -4,7 +4,7 @@ import numpy as np
 # path and dataset parameter
 #
 
-train_data_path='/mnt/disk1/darknet/train.txt'
+train_data_path='/mnt/disk4/nn/datasets/VOC/train.txt'
 object_scale=5
 noobject_scale=1
 class_scale=1
@@ -13,7 +13,7 @@ image_size = 416
 batch_size = 8
 
 test_path = 'test'
-test_img = os.path.join(test_path, 'person.jpg')
+test_img = os.path.join(test_path, 'dog.jpg')
 cell_size = 13
 num_class = 80
 boxes_per_cell = 5
