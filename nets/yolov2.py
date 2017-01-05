@@ -21,38 +21,38 @@ ALPHA = 0.1
                                 #'core/re_org.so'))
 #reorg_func = _reorg_module.re_org
 #def cond_cls_region(
-def yolo_net(inputs,batch_size):
-        layer0 = conv2d(inputs, 32, [3, 3], 1, padding='SAME', scope='conv0')
+def yolo_net(inputs,batch_size,trainable):
+        layer0 = conv2d(inputs, 32, [3, 3], 1, padding='SAME', scope='conv0',trainable=trainable)
         layer1 = slim.max_pool2d(layer0, [2, 2], scope='pool1')
-        layer2 = conv2d(layer1, 64, [3, 3], 1, padding='SAME', scope='conv2')
+        layer2 = conv2d(layer1, 64, [3, 3], 1, padding='SAME', scope='conv2',trainable=trainable)
         layer3 = slim.max_pool2d(layer2, [2, 2], scope='pool3')
-        layer4 = conv2d(layer3, 128, [3, 3], 1, padding='SAME', scope='conv4')
-        layer5 = conv2d(layer4, 64, [1, 1], 1, padding='SAME', scope='conv5')
-        layer6 = conv2d(layer5, 128, [3, 3], 1, padding='SAME', scope='conv6')
+        layer4 = conv2d(layer3, 128, [3, 3], 1, padding='SAME', scope='conv4',trainable=trainable)
+        layer5 = conv2d(layer4, 64, [1, 1], 1, padding='SAME', scope='conv5',trainable=trainable)
+        layer6 = conv2d(layer5, 128, [3, 3], 1, padding='SAME', scope='conv6',trainable=trainable)
         layer7 = slim.max_pool2d(layer6, [2, 2], scope='pool7')
-        layer8 = conv2d(layer7, 256, [3, 3], 1, padding='SAME', scope='conv8')
-        layer9 = conv2d(layer8, 128, [1, 1], 1, padding='SAME', scope='conv9')
-        layer10 = conv2d(layer9, 256, [3, 3], 1, padding='SAME', scope='conv10')
+        layer8 = conv2d(layer7, 256, [3, 3], 1, padding='SAME', scope='conv8',trainable=trainable)
+        layer9 = conv2d(layer8, 128, [1, 1], 1, padding='SAME', scope='conv9',trainable=trainable)
+        layer10 = conv2d(layer9, 256, [3, 3], 1, padding='SAME', scope='conv10',trainable=trainable)
         layer11 = slim.max_pool2d(layer10, [2, 2], scope='pool11')
-        layer12 = conv2d(layer11, 512, [3, 3], 1, padding='SAME', scope='conv12')
-        layer13 = conv2d(layer12, 256, [1, 1], 1, padding='SAME', scope='conv13')
-        layer14 = conv2d(layer13, 512, [3, 3], 1, padding='SAME', scope='conv14')
-        layer15 = conv2d(layer14, 256, [1, 1], 1, padding='SAME', scope='conv15')
-        layer16 = conv2d(layer15, 512, [3, 3], 1, padding='SAME', scope='conv16')
+        layer12 = conv2d(layer11, 512, [3, 3], 1, padding='SAME', scope='conv12',trainable=trainable)
+        layer13 = conv2d(layer12, 256, [1, 1], 1, padding='SAME', scope='conv13',trainable=trainable)
+        layer14 = conv2d(layer13, 512, [3, 3], 1, padding='SAME', scope='conv14',trainable=trainable)
+        layer15 = conv2d(layer14, 256, [1, 1], 1, padding='SAME', scope='conv15',trainable=trainable)
+        layer16 = conv2d(layer15, 512, [3, 3], 1, padding='SAME', scope='conv16',trainable=trainable)
         layer17 = slim.max_pool2d(layer16, [2, 2], scope='pool17')
-        layer18 = conv2d(layer17, 1024, [3, 3], 1, padding='SAME', scope='conv18')
-        layer19 = conv2d(layer18, 512, [1, 1], 1, padding='SAME', scope='conv19')
-        layer20 = conv2d(layer19, 1024, [3, 3], 1, padding='SAME', scope='conv20')
-        layer21 = conv2d(layer20, 512, [1, 1], 1, padding='SAME', scope='conv21')
-        layer22 = conv2d(layer21, 1024, [3, 3], 1, padding='SAME', scope='conv22')
-        layer23 = conv2d(layer22, 1024, [3, 3], 1, padding='SAME', scope='conv23')
-        layer24 = conv2d(layer23, 1024, [3, 3], 1, padding='SAME', scope='conv24')
+        layer18 = conv2d(layer17, 1024, [3, 3], 1, padding='SAME', scope='conv18',trainable=trainable)
+        layer19 = conv2d(layer18, 512, [1, 1], 1, padding='SAME', scope='conv19',trainable=trainable)
+        layer20 = conv2d(layer19, 1024, [3, 3], 1, padding='SAME', scope='conv20',trainable=trainable)
+        layer21 = conv2d(layer20, 512, [1, 1], 1, padding='SAME', scope='conv21',trainable=trainable)
+        layer22 = conv2d(layer21, 1024, [3, 3], 1, padding='SAME', scope='conv22',trainable=trainable)
+        layer23 = conv2d(layer22, 1024, [3, 3], 1, padding='SAME', scope='conv23',trainable=trainable)
+        layer24 = conv2d(layer23, 1024, [3, 3], 1, padding='SAME', scope='conv24',trainable=trainable)
         layer25 = layer16
         #layer26 = reorg(layer25,(batch_size,13,13,2048))
         layer26 = slim.array_ops.space_to_depth(layer25,2)
         layer27 = slim.array_ops.concat(3,[layer26,layer24])
-        layer28 = conv2d(layer27, 1024, [3, 3], 1, padding='SAME', scope='conv28')
-        layer29 = conv2d_with_linear(layer28, 425, [1, 1], 1, padding='SAME', scope='conv29')
+        layer28 = conv2d(layer27, 1024, [3, 3], 1, padding='SAME', scope='conv28',trainable=trainable)
+        layer29 = conv2d_with_linear(layer28, 425, [1, 1], 1, padding='SAME', scope='conv29',trainable=trainable)
         layer29 = slim.array_ops.reshape(layer29,[batch_size,13,13,5,85])
         #print layer29
 
@@ -134,9 +134,10 @@ def reorg(inputs,shape):
     return tf.concat(1,[output1,output2,output3,output4])
 
 
-def conv2d(inputs,filters,kernel_size,stride,padding,scope):
+def conv2d(inputs,filters,kernel_size,stride,padding,scope,trainable):
     with slim.arg_scope([slim.conv2d],
                       activation_fn=None,
+                      trainable=trainable,
                       normalizer_fn=slim.batch_norm,
                       normalizer_params={
                           'scale':True,
@@ -150,10 +151,11 @@ def conv2d(inputs,filters,kernel_size,stride,padding,scope):
         part4 = leaky_relu(part3)
         return part4
 
-def conv2d_with_linear(inputs,filters,kernel_size,stride,padding,scope):
+def conv2d_with_linear(inputs,filters,kernel_size,stride,padding,scope,trainable):
     with slim.arg_scope([slim.conv2d],
                       activation_fn=None,
                       normalizer_fn=None,
+                      trainable=trainable,
                       weights_initializer=tf.constant_initializer(0),
                       biases_initializer=tf.constant_initializer(0)):
         part1 = slim.conv2d(inputs, filters, kernel_size, stride, padding='SAME', scope=scope)

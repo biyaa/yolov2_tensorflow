@@ -11,7 +11,7 @@ import cv2
 import numpy as np
 import tensorflow as tf
 import config.yolov2_config as cfg
-#import utils.pascal_voc as voc
+import utils.pascal_voc as voc
 import yolov2_train as train
 from utils.timer import Timer
 slim = tf.contrib.slim
@@ -20,8 +20,8 @@ slim = tf.contrib.slim
 
 # Load the images and labels.
 #voc._get_train_paths()
-#voc.get_next_batch()
-#voc.read_file()
+images,labels = voc.get_next_batch()
+
 ## Create the model.
 #scene_predictions, depth_predictions, pose_predictions = CreateMultiTaskModel(images)
 #
@@ -42,8 +42,13 @@ inputs = cv2.resize(img, (cfg.image_size, cfg.image_size)).astype(np.float32)
 inputs = cv2.cvtColor(inputs, cv2.COLOR_BGR2RGB).astype(np.float32)
 inputs = (inputs / 255.0) 
 inputs = np.reshape(inputs, (1, cfg.image_size, cfg.image_size, 3))
-
-net = train.tf_post_precess(inputs,1)
+inputs = images
+#print labels[np.isnan(labels)]
+#net = train.tf_post_process(inputs,images[0])
+train_imgs = tf.placeholder(dtype=tf.float32,shape=images.shape)
+train_lbls = tf.placeholder(dtype=tf.float32,shape=labels.shape)
+print train_imgs
+iou = train._train(train_imgs,train_lbls)
 init = tf.global_variables_initializer()
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
@@ -65,16 +70,20 @@ with tf.Session(config=config) as sess:
     print restore_T.average_time
     run_T = Timer()
     run_T.tic()
-    net_output = sess.run(net)
-    out = net_output[...,5:] * net_output[...,4:5]
-    #print net_output[...,5:]
-    #print net_output[...,4:5]
-    out[out<cfg.threshold] =0
-    out_m = np.max(out,4)    
-    out_i = np.argmax(out,4)
-    #print out_m
-    print "net_output:",out_i [out_m > cfg.threshold]
-    print "net_output:",out_m [out_m > cfg.threshold]
+    #boxiou = sess.run(iou)
+    train = sess.run(iou)
     run_T.toc()
-    print run_T.average_time
+    #print boxiou.shape
+    ##net_output = sess.run(net)
+    #out = net_output[...,5:] * net_output[...,4:5]
+    ##print net_output[...,5:]
+    ##print net_output[...,4:5]
+    #out[out<cfg.threshold] =0
+    #out_m = np.max(out,4)    
+    #out_i = np.argmax(out,4)
+    ##print out_m
+    #print "net_output:",out_i [out_m > cfg.threshold]
+    #print "net_output:",out_m [out_m > cfg.threshold]
+    #run_T.toc()
+    #print run_T.average_time
 

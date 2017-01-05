@@ -11,10 +11,11 @@
 import tensorflow as tf
 import config.yolov2_config as cfg
 import utils.pascal_voc as voc
+import utils.stat as stat
 import nets.yolov2 as yolo
 from utils.timer import Timer
 slim = tf.contrib.slim
-voc.sep_config(cfg)
+voc.set_config(cfg)
 
 
 # Load the images and labels.
@@ -35,22 +36,25 @@ voc.sep_config(cfg)
 #
 ## (Regularization Loss is included in the total loss by default).
 #total_loss2 = losses.gep_total_loss()
-def box_iou(preds,truths):
+def box_iou_by_pred(preds,truths):
+    truths = tf.expand_dims(truths,1)
+    truths = tf.expand_dims(truths,1)
+    truths = tf.expand_dims(truths,1)
     # coords
     p_x = preds[...,0:1]
     p_y = preds[...,1:2]
-    p_w = preds[...,2]
-    p_h = preds[...,3]
+    p_w = preds[...,2:3]
+    p_h = preds[...,3:4]
 
     p_l = p_x - p_w/2
     p_r = p_x + p_w/2
     p_t = p_y - p_h/2
     p_b = p_y + p_h/2
 
-    t_x = truths[...,0:1]
-    t_y = truths[...,1:2]
-    t_w = truths[...,2:3]
-    t_h = truths[...,3:4]
+    t_x = truths[...,0]
+    t_y = truths[...,1]
+    t_w = truths[...,2]
+    t_h = truths[...,3]
 
     t_l = t_x - t_w/2
     t_r = t_x + t_w/2
@@ -58,8 +62,8 @@ def box_iou(preds,truths):
     t_b = t_y + t_h/2
 
     # box intersection
-    x_w = tf.minimum(t_r - p_r) - tf.maximum(t_l - p_l)
-    x_h = tf.minimum(t_b - p_b) - tf.maximum(t_t - p_t)
+    x_w = tf.minimum(t_r , p_r) - tf.maximum(t_l , p_l)
+    x_h = tf.minimum(t_b , p_b) - tf.maximum(t_t , p_t)
     area_intersction = x_w * x_h
     area_intersction = tf.maximum(area_intersction,0)
     
@@ -69,8 +73,7 @@ def box_iou(preds,truths):
     area_union = area_p + area_t - area_intersction
     return area_intersction/area_union
 
-def tf_post_precess(images,batch):
-    predicts = yolo.yolo_net(images,images.shape[0])
+def tf_post_process(predicts):
     # 1. x,y,w,h处理
     # 2. scale处理
     # 3. class处理
@@ -104,3 +107,88 @@ def tf_post_precess(images,batch):
     #p_probs = p_classes * p_c
     return tf.concat(4,[p_x,p_y,p_w,p_h,p_c,p_classes])
 
+def sigmoid_gradient(x):
+    return (1-x)*x
+
+def delta_obj_scales(pred_scales,cfg_scale,iou):
+    d_scales = cfg_scale * ((iou - pred_scales) * sigmoid_gradient(pred_scales))
+    return d_scales
+
+def delta_noobj_scales(pred_scales,cfg_scale):
+    d_scales = cfg_scale * ((0 - pred_scales) * sigmoid_gradient(pred_scales))
+    return d_scales
+
+def loss(images,labels):
+    batch = images.get_shape()[0].value
+    print images,batch
+    predicts = yolo.yolo_net(images,batch,trainable=True)
+    net_out = tf_post_process(predicts)
+    delta = tf.Variable(tf.zeros(net_out.get_shape()))
+
+    # 1. init delta
+    delta_scales = delta[...,4:5]
+    delta_scales = delta_noobj_scales(net_out[...,4:5],cfg.noobject_scale)
+
+    # 2. compute avg_anyobj
+    stat.avg_anyobj = tf.reduce_sum(net_out[...,4:5])
+    # 3. compute best_iou
+    iou_by_pred = box_iou_by_pred(net_out,labels)
+    best_iou_by_pred = tf.reduce_max(iou_by_pred,-1,keep_dims=True)
+    # 4. in delta_scales, select best_iou>threshold to set 0
+    cond = best_iou_by_pred > cfg.threshold
+    delta_scales = tf.where(cond,delta_scales*0,delta_scales)
+    
+    truths = labels[...,:4]
+
+    t_x = truths[...,0:1]
+    t_y = truths[...,1:2]
+    t_x = t_x * cfg.cell_size
+    t_y = t_y * cfg.cell_size
+
+    t_shift_x = t_x * 0
+    t_shift_y = t_y * 0
+
+    truths_shift = tf.concat(2,[t_shift_x,t_shift_y,truths[...,2:4]])
+    preds = net_out[...,:4]
+    print preds
+
+    p_x = preds[...,0:1]
+    p_y = preds[...,1:2]
+    p_shift_x = p_x * 0
+    p_shift_y = p_y * 0
+
+    preds_shift = tf.concat(4,[p_shift_x,p_shift_y,preds[...,2:4]])
+
+    shift_iou = box_iou_by_pred(preds_shift,truths_shift)
+    print delta
+    return delta
+
+
+def _train(images,labels):
+    return loss(images,labels)
+
+def train():
+    log_dir = cfg.train_log_path
+
+    init = tf.global_variables_initializer()
+    sess = tf.Session()
+    sess.run(init)
+
+    for i in xrange(cfg.max_steps):
+        images,labels = voc.get_next_batch()
+        train_imgs = tf.placeholder(dtype=tf.float32,shape=images.shape)
+        train_lbls = tf.placeholder(dtype=tf.float32,shape=labels.shape)
+        t_loss = loss(train_imgs,train_lbls)
+        train_op = tf.train.MomentumOptimizer(cfg.learning_rate,cfg.momentum).minimize(t_loss)
+        if i % 10 == 0:  # Record summaries and test-set accuracy
+            print('at step %s' % (i))
+        else:  # Record train set summaries, and train
+             _ = sess.run(train_op, feed_dict={train_imgs: images, train_lbls: labels})
+
+    train_writer.add_summary(i)
+    sess.close()
+
+train()
+
+
+    

@@ -5,12 +5,16 @@ import numpy as np
 #
 
 train_data_path='/mnt/disk4/nn/datasets/VOC/train.txt'
+train_log_path='/mnt/disk4/nn/tf-env/tim/yolov2_tensorflow/ckpt'
 object_scale=5
 noobject_scale=1
 class_scale=1
 coord_scale=1
 image_size = 416
 batch_size = 8
+momentum=0.9
+learning_rate = 0.00001
+max_steps = 50000
 
 test_path = 'test'
 test_img = os.path.join(test_path, 'dog.jpg')
@@ -19,7 +23,7 @@ num_class = 80
 boxes_per_cell = 5
 coords = 4
 scale = 1
-threshold = 0.5
+threshold = 0.6
 anchors = np.array([0.738768,0.874946,  2.42204,2.65704,  4.30971,7.04493,  10.246,4.59428,  12.6868,11.8741],dtype=np.float32)
 weight_dir ='nets/weights/'
 out_file = 'nets/ckpt/yolo_hgx.ckpt'
