@@ -77,6 +77,8 @@ def get_next_batch():
 
         label= read_label(path[1])
         box_num = label.shape[0]
+        if box_num >30:
+            box_num =30
         labels[i,0:box_num,:] = label
         #print labels[i].shape
 

@@ -57,26 +57,25 @@ def yolo_net(inputs,batch_size,trainable):
         #print layer29
 
 
-        layer30 = slim.nn.sigmoid(layer29[:,:,:,:,0:2],name="coords_xy")
-        # (x + col)/w
-        layer31 = xy_add_cr_div_size(layer30[:,:,:,:,0:1],2,13,name="x_add_col_div_size")
-        # (y + row)/h
-        layer32 = xy_add_cr_div_size(layer30[:,:,:,:,1:2],1,13,name="x_add_row_div_size")
-        layer33 = slim.math_ops.exp(layer29[:,:,:,:,2:4],name="coords_wh")
-        layer33 = layer33 / 13
-        layer34 = slim.nn.sigmoid(layer29[:,:,:,:,4:5],name="scale")
-
-        layer40 = tf.reduce_max(layer29[:,:,:,:,5:],4,name="max_class")
-        layer41 = slim.array_ops.expand_dims(layer40,-1,name="scale")
-        layer42 = slim.math_ops.sub(layer29[:,:,:,:,5:],layer41,name="sub_max")
-        layer43 = slim.nn.softmax(layer42,name="class_softmax")
-
-        layer50 = slim.array_ops.concat(4,[layer31,layer32,layer33,layer34,layer43])
-        print layer34
-        print layer43
-        
+#        layer30 = slim.nn.sigmoid(layer29[:,:,:,:,0:2],name="coords_xy")
+#        # (x + col)/w
+#        layer31 = xy_add_cr_div_size(layer30[:,:,:,:,0:1],2,13,name="x_add_col_div_size")
+#        # (y + row)/h
+#        layer32 = xy_add_cr_div_size(layer30[:,:,:,:,1:2],1,13,name="x_add_row_div_size")
+#        layer33 = slim.math_ops.exp(layer29[:,:,:,:,2:4],name="coords_wh")
+#        layer33 = layer33 / 13
+#        layer34 = slim.nn.sigmoid(layer29[:,:,:,:,4:5],name="scale")
+#
+#        layer40 = tf.reduce_max(layer29[:,:,:,:,5:],4,name="max_class")
+#        layer41 = slim.array_ops.expand_dims(layer40,-1,name="scale")
+#        layer42 = slim.math_ops.sub(layer29[:,:,:,:,5:],layer41,name="sub_max")
+#        layer43 = slim.nn.softmax(layer42,name="class_softmax")
+#
+#        layer50 = slim.array_ops.concat(4,[layer31,layer32,layer33,layer34,layer43])
+#        print layer34
+#        print layer43
+#        
         return layer29
-
 def xy_add_cr_div_size(inputs,cr,cell_size,name):
     shape = inputs.get_shape()
     #print shape

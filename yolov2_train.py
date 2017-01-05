@@ -36,6 +36,74 @@ voc.set_config(cfg)
 #
 ## (Regularization Loss is included in the total loss by default).
 #total_loss2 = losses.gep_total_loss()
+def box_iou(pred,truth):
+    p_x = pred[...,0:1]
+    p_y = pred[...,1:2]
+    p_w = pred[...,2:3]
+    p_h = pred[...,3:4]
+
+    p_l = p_x - p_w/2
+    p_r = p_x + p_w/2
+    p_t = p_y - p_h/2
+    p_b = p_y + p_h/2
+
+    t_x = truth[...,0:1]
+    t_y = truth[...,1:2]
+    t_w = truth[...,2:3]
+    t_h = truth[...,3:4]
+
+    t_l = t_x - t_w/2
+    t_r = t_x + t_w/2
+    t_t = t_y - t_h/2
+    t_b = t_y + t_h/2
+    # box intersection
+    x_w = tf.minimum(t_r , p_r) - tf.maximum(t_l , p_l)
+    x_h = tf.minimum(t_b , p_b) - tf.maximum(t_t , p_t)
+    area_intersction = x_w * x_h
+    area_intersction = tf.maximum(area_intersction,0)
+    
+    # box union
+    area_p = p_w * p_h
+    area_t = t_w * t_h
+    area_union = area_p + area_t - area_intersction
+    return area_intersction/area_union
+
+def box_iou_by_truths(preds,truths,b,i,j,t):
+    preds00 = preds[b,j,i,:,:]
+    truths00 = truths[b,t,:]
+    #print preds00,truths00
+    # coords
+    p_x = preds00[...,0]
+    p_y = preds00[...,1]
+    p_w = preds00[...,2]
+    p_h = preds00[...,3]
+
+    p_l = p_x - p_w/2
+    p_r = p_x + p_w/2
+    p_t = p_y - p_h/2
+    p_b = p_y + p_h/2
+
+    t_x = truths00[...,0:1]
+    t_y = truths00[...,1:2]
+    t_w = truths00[...,2:3]
+    t_h = truths00[...,3:4]
+
+    t_l = t_x - t_w/2
+    t_r = t_x + t_w/2
+    t_t = t_y - t_h/2
+    t_b = t_y + t_h/2
+    # box intersection
+    x_w = tf.minimum(t_r , p_r) - tf.maximum(t_l , p_l)
+    x_h = tf.minimum(t_b , p_b) - tf.maximum(t_t , p_t)
+    area_intersction = x_w * x_h
+    area_intersction = tf.maximum(area_intersction,0)
+    
+    # box union
+    area_p = p_w * p_h
+    area_t = t_w * t_h
+    area_union = area_p + area_t - area_intersction
+    return area_intersction/area_union
+
 def box_iou_by_pred(preds,truths):
     truths = tf.expand_dims(truths,1)
     truths = tf.expand_dims(truths,1)
@@ -118,25 +186,31 @@ def delta_noobj_scales(pred_scales,cfg_scale):
     d_scales = cfg_scale * ((0 - pred_scales) * sigmoid_gradient(pred_scales))
     return d_scales
 
-def loss(net,labels):
-    net_out = tf_post_process(net)
-    delta = tf.Variable(tf.zeros(net_out.get_shape()))
 
-    # 1. init delta
-    delta_scales = delta[...,4:5]
-    delta_scales = delta_noobj_scales(net_out[...,4:5],cfg.noobject_scale)
+def do_assign(ref,v,value):
+    return tf.assign(ref,v.assign(value))
 
-    # 2. compute avg_anyobj
-    stat.avg_anyobj = tf.reduce_sum(net_out[...,4:5])
-    # 3. compute best_iou
-    iou_by_pred = box_iou_by_pred(net_out,labels)
-    best_iou_by_pred = tf.reduce_max(iou_by_pred,-1,keep_dims=True)
-    # 4. in delta_scales, select best_iou>threshold to set 0
-    cond = best_iou_by_pred > cfg.threshold
-    delta_scales = tf.where(cond,delta_scales*0,delta_scales)
-    
-    truths = labels[...,:4]
+def _delta_region_box(truths,net,preds,cfg_anchors,cfg_scale,b,i,j,n,t,delta):
+    n = tf.to_int32(n)
+    n1 = 2 * n
+    n2 = 2 * n +1
+    pred = preds[b,j,i,n,:4]
+    pre = net[b,j,i,n,:4]
+    truth = truths[b,n,:4]
+    iou = box_iou(pred,truth)
+    stat.avg_iou = stat.avg_iou + iou
+    t_x = truth[0] * cfg.cell_size - tf.to_float(i)
+    t_y = truth[1] * cfg.cell_size - tf.to_float(j)
+    t_w = tf.log(truth[2] * cfg.cell_size )#/ cfg.anchors[n1])
+    t_h = tf.log(truth[3] * cfg.cell_size )#/ cfg.anchors[n2])
+    #print delta
+    d1 = do_assign(delta,delta[b,j,i,n,0],cfg.object_scale*(t_x-tf.sigmoid(pre[0])) * sigmoid_gradient(tf.sigmoid(pre[0])))
+    d2 = do_assign(d1,delta[b,j,i,n,1],cfg.object_scale*(t_y-tf.sigmoid(pre[1])) * sigmoid_gradient(tf.sigmoid(pre[1])))
+    d3 = do_assign(d2,delta[b,j,i,n,2],cfg.object_scale*(t_w-pre[2]))
+    d4 = do_assign(d3,delta[b,j,i,n,3],cfg.object_scale*(t_h-pre[3]))
+    return d4
 
+def _delta_by_truths(truths,net,preds,delta):
     t_x = truths[...,0:1]
     t_y = truths[...,1:2]
     t_x = t_x * cfg.cell_size
@@ -146,18 +220,79 @@ def loss(net,labels):
     t_shift_y = t_y * 0
 
     truths_shift = tf.concat(2,[t_shift_x,t_shift_y,truths[...,2:4]])
-    preds = net_out[...,:4]
-    print preds
 
     p_x = preds[...,0:1]
     p_y = preds[...,1:2]
     p_shift_x = p_x * 0
     p_shift_y = p_y * 0
+    #print preds[:,1,1,:,:]
+    #print truths
 
     preds_shift = tf.concat(4,[p_shift_x,p_shift_y,preds[...,2:4]])
 
-    shift_iou = box_iou_by_pred(preds_shift,truths_shift)
-    print delta
+    # 8. compute shift_iou and best_shift_iou_by_pred
+    #shift_iou = box_iou_by_pred(preds_shift,truths_shift)
+    #print shift_iou
+    #best_shift_iou_by_pred = tf.reduce_max(shift_iou,-1,keep_dims=True)
+    #print best_shift_iou_by_pred
+    
+    #print t_x
+    for b in xrange(truths.get_shape()[0]):
+        for t in xrange(30):
+            i = t_x[b,t,0]
+            j = t_y[b,t,0]
+            i =tf.to_int32(i)
+            j =tf.to_int32(j)
+            shift_iou = box_iou_by_truths(preds_shift,truths_shift,b,i,j,t)
+            best_shift_iou = tf.reduce_max(shift_iou,-1,keep_dims=True)
+            #print shift_iou
+            best_shift_n = tf.arg_max(shift_iou,0)
+            best_shift_n =tf.to_int32(best_shift_n)
+        
+            #print best_shift_n
+            delta_box = _delta_region_box(truths,net,preds,cfg.anchors,cfg.coord_scale,b,i,j,best_shift_n,t,delta)
+            print delta_box
+
+
+
+
+def loss(net,labels):
+    net_out = tf_post_process(net)
+    delta = tf.Variable(tf.zeros(net_out.get_shape()))
+
+    # 1. init delta
+    delta_scales = delta[...,4:5]
+    delta_region_box = delta[...,:4]
+
+    stat.set_zero()
+    # 2. compute delta_scales
+    delta_scales = delta_noobj_scales(net_out[...,4:5],cfg.noobject_scale)
+    
+
+    # 3. compute avg_anyobj
+    stat.avg_anyobj = tf.reduce_sum(net_out[...,4:5])
+    # 4. compute best_iou
+    iou_by_pred = box_iou_by_pred(net_out,labels)
+    best_iou_by_pred = tf.reduce_max(iou_by_pred,-1,keep_dims=True)
+    # 5. in delta_scales, select best_iou>threshold to set 0
+    cond = best_iou_by_pred > cfg.threshold
+    delta_scales = tf.where(cond,delta_scales*0,delta_scales)
+    
+    # 6. compose of truths_shift
+    truths = labels[...,:4]
+
+
+
+    # 7. compose of preds_shift
+    preds = net_out[...,:4]
+    #print preds
+
+
+
+    # 9. compute delta_region_box
+    _ = _delta_by_truths(truths,net[...,:4],preds,delta)
+    
+    #print delta
     return delta
 
 
@@ -178,14 +313,16 @@ def train():
     sess = tf.Session()
     writer = tf.summary.FileWriter("logs/",sess.graph)
     sess.run(init)
+    avg_iou = 0
 
     for i in xrange(cfg.max_steps):
         with sess.as_default():
-            print stat.avg_iou.eval()
-            if i % 10 == 0:  # Record summaries and test-set accuracy
-                print('at step %s' % (i))
-            else:  # Record train set summaries, and train
-                 _ = sess.run(train_op, feed_dict={train_imgs: images, train_lbls: labels})
+            if i % 10 == 0:
+                print avg_iou
+                print('step:%s,avg_iou:%s' % (i,avg_iou))
+            else:
+                _,avg_iou = sess.run([train_op,stat.avg_iou], feed_dict={train_imgs: images, train_lbls: labels})
+
         images,labels = voc.get_next_batch()
 
     train_writer.add_summary(i)
