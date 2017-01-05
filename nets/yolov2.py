@@ -175,4 +175,4 @@ def scale_bias(inputs,data_format=DATA_FORMAT_NHWC,scope='BatchNorm'):
         return slim.math_ops.mul(inputs,scales)
 
 def leaky_relu(inputs):
-    return slim.math_ops.maximum(inputs,ALPHA*inputs)
+    return slim.math_ops.maximum(inputs,ALPHA*inputs,"leaky_relu")

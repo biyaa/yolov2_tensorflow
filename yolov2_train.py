@@ -118,11 +118,8 @@ def delta_noobj_scales(pred_scales,cfg_scale):
     d_scales = cfg_scale * ((0 - pred_scales) * sigmoid_gradient(pred_scales))
     return d_scales
 
-def loss(images,labels):
-    batch = images.get_shape()[0].value
-    print images,batch
-    predicts = yolo.yolo_net(images,batch,trainable=True)
-    net_out = tf_post_process(predicts)
+def loss(net,labels):
+    net_out = tf_post_process(net)
     delta = tf.Variable(tf.zeros(net_out.get_shape()))
 
     # 1. init delta
@@ -170,20 +167,26 @@ def _train(images,labels):
 def train():
     log_dir = cfg.train_log_path
 
+    images,labels = voc.get_next_batch()
+    train_imgs = tf.placeholder(dtype=tf.float32,shape=images.shape)
+    train_lbls = tf.placeholder(dtype=tf.float32,shape=labels.shape)
+    net = yolo.yolo_net(train_imgs,images.shape[0],trainable=True)
+    t_loss = loss(net,train_lbls)
+    train_op = tf.train.MomentumOptimizer(cfg.learning_rate,cfg.momentum).minimize(t_loss)
+
     init = tf.global_variables_initializer()
     sess = tf.Session()
+    writer = tf.summary.FileWriter("logs/",sess.graph)
     sess.run(init)
 
     for i in xrange(cfg.max_steps):
+        with sess.as_default():
+            print stat.avg_iou.eval()
+            if i % 10 == 0:  # Record summaries and test-set accuracy
+                print('at step %s' % (i))
+            else:  # Record train set summaries, and train
+                 _ = sess.run(train_op, feed_dict={train_imgs: images, train_lbls: labels})
         images,labels = voc.get_next_batch()
-        train_imgs = tf.placeholder(dtype=tf.float32,shape=images.shape)
-        train_lbls = tf.placeholder(dtype=tf.float32,shape=labels.shape)
-        t_loss = loss(train_imgs,train_lbls)
-        train_op = tf.train.MomentumOptimizer(cfg.learning_rate,cfg.momentum).minimize(t_loss)
-        if i % 10 == 0:  # Record summaries and test-set accuracy
-            print('at step %s' % (i))
-        else:  # Record train set summaries, and train
-             _ = sess.run(train_op, feed_dict={train_imgs: images, train_lbls: labels})
 
     train_writer.add_summary(i)
     sess.close()
