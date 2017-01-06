@@ -9,6 +9,7 @@
 """
 
 import tensorflow as tf
+import numpy as np
 import config.yolov2_config as cfg
 import utils.pascal_voc as voc
 import utils.stat as stat
@@ -266,13 +267,14 @@ def _delta_by_truths(truths,net,preds,delta):
 
 
 
-def loss(net,labels):
+def loss(net,labels,delta_mask):
     net_out = tf_post_process(net)
-    delta = tf.Variable(tf.zeros(net_out.get_shape()))
+    #delta = tf.Variable(tf.zeros(net_out.get_shape()))
 
     # 1. init delta
-    delta_scales = delta[...,4:5]
-    delta_region_box = delta[...,:4]
+    #delta_scales = delta[...,4:5]
+    #delta_region_box = delta[...,:4]
+    print delta_mask
 
     stat.set_zero()
     # 2. compute delta_scales
@@ -290,6 +292,15 @@ def loss(net,labels):
     
     # 6. compose of truths_shift
     truths = labels[...,:4]
+    t_x = truths[...,0:1]
+    t_y = truths[...,1:2]
+    t_x = t_x * cfg.cell_size
+    t_y = t_y * cfg.cell_size
+
+    t_shift_x = t_x * 0
+    t_shift_y = t_y * 0
+
+    truths_shift = tf.concat(2,[t_shift_x,t_shift_y,truths[...,2:4]])
 
 
 
@@ -298,18 +309,59 @@ def loss(net,labels):
     #print preds
 
 
+    p_x = preds[...,0:1]
+    p_y = preds[...,1:2]
+    p_shift_x = p_x * 0
+    p_shift_y = p_y * 0
+    #print preds[:,1,1,:,:]
+    #print truths
+
+    preds_shift = tf.concat(4,[p_shift_x,p_shift_y,preds[...,2:4]])
+
+    iou_shift_by_pred = box_iou_by_pred(preds_shift,truths_shift)
+    best_iou_by_pred = tf.reduce_max(iou_by_pred,-1,keep_dims=True)
+
+
+
 
     # 9. compute delta_region_box
-    delta = _delta_by_truths(truths,net,preds,delta)
+    #delta = _delta_by_truths(truths,net,preds,delta)
     
     #pred_class = net_out[...,5:]
     #delta_class = tf.nn.softmax_cross_entropy_with_logits(pred_class,truths[...,4:5])
     #print delta
     # 10. compute delta_region_class
 
-    return net * delta
+    return delta_scales
+
+def _delta_mask(labels):
+    shape = labels.shape
+    batch = shape[0]
+    box_num = shape[1]
+    # init mask
+    delta_shape = (labels.shape[0],cfg.cell_size,cfg.cell_size,5,85)
+    delta_mask = np.zeros(delta_shape,dtype=np.bool)
+    delta_mask[...] = False
+    x = 0
+    y = 0
+    c = 0
+    # compute mask
+    for b in xrange(batch):
+        for n in xrange(box_num):
+            if labels[b,n,0] > 0.00001:
+                x = np.int(labels[b,n,0] * cfg.cell_size)
+                y = np.int(labels[b,n,1] * cfg.cell_size)
+                c = np.int(labels[b,n,4])
+                delta_mask[b,y,x,:,c] = True
+                #print delta_mask[b,y,x,:,:]
+                
+    return delta_mask
 
 
+
+
+
+    
 def _train(images,labels):
     return loss(images,labels)
 
@@ -317,11 +369,16 @@ def train():
     log_dir = cfg.train_log_path
 
     images,labels = voc.get_next_batch()
+    delta_mask = _delta_mask(labels)
+
     train_imgs = tf.placeholder(dtype=tf.float32,shape=images.shape)
     train_lbls = tf.placeholder(dtype=tf.float32,shape=labels.shape)
+    train_mask = tf.placeholder(dtype=tf.float32,shape=delta_mask.shape)
+
     net = yolo.yolo_net(train_imgs,images.shape[0],trainable=True)
-    t_loss = loss(net,train_lbls)
+    t_loss = loss(net,train_lbls,train_mask)
     train_op = tf.train.MomentumOptimizer(cfg.learning_rate,cfg.momentum).minimize(t_loss)
+
 
     init = tf.global_variables_initializer()
     sess = tf.Session()
@@ -337,7 +394,7 @@ def train():
                 print avg_iou
                 print('step:%s,avg_iou:%s,avg_obj:%s,avg_noobj:%s' % (i,avg_iou,avg_obj,avg_noobj))
             else:
-                _,avg_iou,avg_obj,avg_noobj= sess.run([train_op,stat.avg_iou,stat.avg_obj,stat.avg_anyobj], feed_dict={train_imgs: images, train_lbls: labels})
+                _,avg_iou,avg_obj,avg_noobj= sess.run([train_op,stat.avg_iou,stat.avg_obj,stat.avg_anyobj], feed_dict={train_imgs: images, train_lbls: labels,train_mask:delta_mask})
 
         images,labels = voc.get_next_batch()
 
