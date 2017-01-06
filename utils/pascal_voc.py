@@ -79,7 +79,7 @@ def get_next_batch():
         box_num = label.shape[0]
         if box_num >30:
             box_num =30
-        labels[i,0:box_num,:] = label
+        labels[i,0:box_num,:] = label[:box_num]
         #print labels[i].shape
 
     return images,labels

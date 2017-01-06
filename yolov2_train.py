@@ -195,20 +195,28 @@ def _delta_region_box(truths,net,preds,cfg_anchors,cfg_scale,b,i,j,n,t,delta):
     n1 = 2 * n
     n2 = 2 * n +1
     pred = preds[b,j,i,n,:4]
-    pre = net[b,j,i,n,:4]
+    pre = net[b,j,i,n,0:5]
     truth = truths[b,n,:4]
     iou = box_iou(pred,truth)
     stat.avg_iou = stat.avg_iou + iou
+    stat.avg_obj = stat.avg_obj + pre[4]
+    #print pre[4]
+
     t_x = truth[0] * cfg.cell_size - tf.to_float(i)
     t_y = truth[1] * cfg.cell_size - tf.to_float(j)
     t_w = tf.log(truth[2] * cfg.cell_size )#/ cfg.anchors[n1])
     t_h = tf.log(truth[3] * cfg.cell_size )#/ cfg.anchors[n2])
     #print delta
-    d1 = do_assign(delta,delta[b,j,i,n,0],cfg.object_scale*(t_x-tf.sigmoid(pre[0])) * sigmoid_gradient(tf.sigmoid(pre[0])))
-    d2 = do_assign(d1,delta[b,j,i,n,1],cfg.object_scale*(t_y-tf.sigmoid(pre[1])) * sigmoid_gradient(tf.sigmoid(pre[1])))
-    d3 = do_assign(d2,delta[b,j,i,n,2],cfg.object_scale*(t_w-pre[2]))
-    d4 = do_assign(d3,delta[b,j,i,n,3],cfg.object_scale*(t_h-pre[3]))
-    return d4
+    d1 = do_assign(delta,delta[b,j,i,n,0],cfg.coord_scale*(t_x-tf.sigmoid(pre[0])) * sigmoid_gradient(tf.sigmoid(pre[0])))
+    d2 = do_assign(d1,delta[b,j,i,n,1],cfg.coord_scale*(t_y-tf.sigmoid(pre[1])) * sigmoid_gradient(tf.sigmoid(pre[1])))
+    d3 = do_assign(d2,delta[b,j,i,n,2],cfg.coord_scale*(t_w-pre[2]))
+    d4 = do_assign(d3,delta[b,j,i,n,3],cfg.coord_scale*(t_h-pre[3]))
+    d5 = do_assign(d4,delta[b,j,i,n,4],cfg.object_scale*(iou-pre[4])*sigmoid_gradient(pre[4]))
+
+
+
+
+    return d5
 
 def _delta_by_truths(truths,net,preds,delta):
     t_x = truths[...,0:1]
@@ -253,6 +261,8 @@ def _delta_by_truths(truths,net,preds,delta):
             delta_box = _delta_region_box(truths,net,preds,cfg.anchors,cfg.coord_scale,b,i,j,best_shift_n,t,delta)
             print delta_box
 
+    return delta_box
+
 
 
 
@@ -290,10 +300,14 @@ def loss(net,labels):
 
 
     # 9. compute delta_region_box
-    _ = _delta_by_truths(truths,net[...,:4],preds,delta)
+    delta = _delta_by_truths(truths,net,preds,delta)
     
+    #pred_class = net_out[...,5:]
+    #delta_class = tf.nn.softmax_cross_entropy_with_logits(pred_class,truths[...,4:5])
     #print delta
-    return delta
+    # 10. compute delta_region_class
+
+    return net * delta
 
 
 def _train(images,labels):
@@ -314,14 +328,16 @@ def train():
     writer = tf.summary.FileWriter("logs/",sess.graph)
     sess.run(init)
     avg_iou = 0
+    avg_obj = 0
+    avg_noobj = 0
 
     for i in xrange(cfg.max_steps):
         with sess.as_default():
             if i % 10 == 0:
                 print avg_iou
-                print('step:%s,avg_iou:%s' % (i,avg_iou))
+                print('step:%s,avg_iou:%s,avg_obj:%s,avg_noobj:%s' % (i,avg_iou,avg_obj,avg_noobj))
             else:
-                _,avg_iou = sess.run([train_op,stat.avg_iou], feed_dict={train_imgs: images, train_lbls: labels})
+                _,avg_iou,avg_obj,avg_noobj= sess.run([train_op,stat.avg_iou,stat.avg_obj,stat.avg_anyobj], feed_dict={train_imgs: images, train_lbls: labels})
 
         images,labels = voc.get_next_batch()
 
