@@ -179,11 +179,11 @@ def tf_post_process(predicts):
 def sigmoid_gradient(x):
     return (1-x)*x
 
-def delta_obj_scales(pred_scales,cfg_scale,iou):
+def _delta_obj_scales(pred_scales,cfg_scale,iou):
     d_scales = cfg_scale * ((iou - pred_scales) * sigmoid_gradient(pred_scales))
     return d_scales
 
-def delta_noobj_scales(pred_scales,cfg_scale):
+def _delta_noobj_scales(pred_scales,cfg_scale):
     d_scales = cfg_scale * ((0 - pred_scales) * sigmoid_gradient(pred_scales))
     return d_scales
 
@@ -274,11 +274,11 @@ def loss(net,labels,delta_mask):
     # 1. init delta
     #delta_scales = delta[...,4:5]
     #delta_region_box = delta[...,:4]
-    print delta_mask
+    #print delta_mask
 
     stat.set_zero()
     # 2. compute delta_scales
-    delta_scales = delta_noobj_scales(net_out[...,4:5],cfg.noobject_scale)
+    delta_scales = _delta_noobj_scales(net_out[...,4:5],cfg.noobject_scale)
     
 
     # 3. compute avg_anyobj
@@ -286,6 +286,7 @@ def loss(net,labels,delta_mask):
     # 4. compute best_iou
     iou_by_pred = box_iou_by_pred(net_out,labels)
     best_iou_by_pred = tf.reduce_max(iou_by_pred,-1,keep_dims=True)
+    #print best_iou_by_pred
     # 5. in delta_scales, select best_iou>threshold to set 0
     cond = best_iou_by_pred > cfg.threshold
     delta_scales = tf.where(cond,delta_scales*0,delta_scales)
@@ -319,7 +320,32 @@ def loss(net,labels,delta_mask):
     preds_shift = tf.concat(4,[p_shift_x,p_shift_y,preds[...,2:4]])
 
     iou_shift_by_pred = box_iou_by_pred(preds_shift,truths_shift)
-    best_iou_by_pred = tf.reduce_max(iou_by_pred,-1,keep_dims=True)
+    #print iou_shift_by_pred
+    best_iou_shift_boxes = tf.reduce_max(iou_shift_by_pred,-1,keep_dims=True)
+    best_iou_shift_n = tf.reduce_max(best_iou_shift_boxes,-2,keep_dims=True)
+    best_iou_shift_boxes = best_iou_shift_boxes - best_iou_shift_n
+
+    best_iou_mask = best_iou_shift_boxes>=0
+    #stat.count = tf.count_nonzero(delta_mask[...,4:5])
+    delta_mask = tf.logical_and(delta_mask, best_iou_mask)
+    #stat.count = tf.count_nonzero(delta_mask[...,4:5])
+
+    print delta_mask
+    mask_iou = tf.where(delta_mask[...,0:1], best_iou_by_pred, best_iou_by_pred*0)
+    # print avg_iou
+    stat.avg_iou = tf.reduce_sum(mask_iou)
+    stat.recall = tf.count_nonzero(mask_iou>0.5) 
+    delta_obj_scales = _delta_obj_scales(net_out[...,4:5], cfg.object_scale, mask_iou)
+    delta_scales = tf.where(delta_mask[...,4:5], delta_obj_scales, delta_scales)
+    mask_obj = tf.where(delta_mask[...,4:5], delta_scales,delta_scales*0)
+    #print avg_obj
+    print mask_obj
+    
+    stat.avg_obj = tf.reduce_sum(mask_obj)
+    stat.count = tf.count_nonzero(mask_obj)
+    print delta_scales
+    #print best_iou_mask
+
 
 
 
@@ -352,9 +378,11 @@ def _delta_mask(labels):
                 x = np.int(labels[b,n,0] * cfg.cell_size)
                 y = np.int(labels[b,n,1] * cfg.cell_size)
                 c = np.int(labels[b,n,4])
-                delta_mask[b,y,x,:,c] = True
+                delta_mask[b,y,x,:,5+c] = True
+                delta_mask[b,y,x,:,0:5] = True
                 #print delta_mask[b,y,x,:,:]
                 
+    print "label count:%s" %(np.count_nonzero(delta_mask)/30)
     return delta_mask
 
 
@@ -373,7 +401,7 @@ def train():
 
     train_imgs = tf.placeholder(dtype=tf.float32,shape=images.shape)
     train_lbls = tf.placeholder(dtype=tf.float32,shape=labels.shape)
-    train_mask = tf.placeholder(dtype=tf.float32,shape=delta_mask.shape)
+    train_mask = tf.placeholder(dtype=tf.bool,shape=delta_mask.shape)
 
     net = yolo.yolo_net(train_imgs,images.shape[0],trainable=True)
     t_loss = loss(net,train_lbls,train_mask)
@@ -387,16 +415,18 @@ def train():
     avg_iou = 0
     avg_obj = 0
     avg_noobj = 0
+    count = 0
+    recall = 0
 
     for i in xrange(cfg.max_steps):
         with sess.as_default():
-            if i % 10 == 0:
-                print avg_iou
-                print('step:%s,avg_iou:%s,avg_obj:%s,avg_noobj:%s' % (i,avg_iou,avg_obj,avg_noobj))
+            if i % 2 == 0:
+                print('step:%s,avg_iou:%s,avg_obj:%s,avg_noobj:%s,count:%s,recall:%s' % (i,avg_iou,avg_obj,avg_noobj,count,recall))
             else:
-                _,avg_iou,avg_obj,avg_noobj= sess.run([train_op,stat.avg_iou,stat.avg_obj,stat.avg_anyobj], feed_dict={train_imgs: images, train_lbls: labels,train_mask:delta_mask})
+                _,avg_iou,avg_obj,avg_noobj,count,recall= sess.run([train_op,stat.avg_iou,stat.avg_obj,stat.avg_anyobj,stat.count,stat.recall], feed_dict={train_imgs: images, train_lbls: labels,train_mask:delta_mask})
 
         images,labels = voc.get_next_batch()
+        delta_mask = _delta_mask(labels)
 
     train_writer.add_summary(i)
     sess.close()
