@@ -191,12 +191,11 @@ def _delta_noobj_scales(pred_scales,cfg_scale):
 def do_assign(ref,v,value):
     return tf.assign(ref,v.assign(value))
 
-def _delta_region_box(truths,net,preds,cfg_anchors,cfg_scale,b,i,j,n,t,delta):
-    n = tf.to_int32(n)
-    n1 = 2 * n
-    n2 = 2 * n +1
-    pred = preds[b,j,i,n,:4]
-    pre = net[b,j,i,n,0:5]
+def _delta_region_box(truths,net,preds,cfg_anchors,cfg_scale,delta):
+    truths = tf.expand_dims(truths,1)
+    truths = tf.expand_dims(truths,1)
+    truths = tf.expand_dims(truths,1)
+    t_x = truths[...,0:1] * cfg.cell_size -
     truth = truths[b,n,:4]
     iou = box_iou(pred,truth)
     stat.avg_iou = stat.avg_iou + iou
