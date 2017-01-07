@@ -191,82 +191,78 @@ def _delta_noobj_scales(pred_scales,cfg_scale):
 def do_assign(ref,v,value):
     return tf.assign(ref,v.assign(value))
 
-def _delta_region_box(truths,net,preds,cfg_anchors,cfg_scale,delta):
-    truths = tf.expand_dims(truths,1)
-    truths = tf.expand_dims(truths,1)
-    truths = tf.expand_dims(truths,1)
-    t_x = truths[...,0:1] * cfg.cell_size -
-    truth = truths[b,n,:4]
-    iou = box_iou(pred,truth)
-    stat.avg_iou = stat.avg_iou + iou
-    stat.avg_obj = stat.avg_obj + pre[4]
+def _delta_region_box(net,truths_in_net):
     #print pre[4]
 
-    t_x = truth[0] * cfg.cell_size - tf.to_float(i)
-    t_y = truth[1] * cfg.cell_size - tf.to_float(j)
-    t_w = tf.log(truth[2] * cfg.cell_size )#/ cfg.anchors[n1])
-    t_h = tf.log(truth[3] * cfg.cell_size )#/ cfg.anchors[n2])
-    #print delta
-    d1 = do_assign(delta,delta[b,j,i,n,0],cfg.coord_scale*(t_x-tf.sigmoid(pre[0])) * sigmoid_gradient(tf.sigmoid(pre[0])))
-    d2 = do_assign(d1,delta[b,j,i,n,1],cfg.coord_scale*(t_y-tf.sigmoid(pre[1])) * sigmoid_gradient(tf.sigmoid(pre[1])))
-    d3 = do_assign(d2,delta[b,j,i,n,2],cfg.coord_scale*(t_w-pre[2]))
-    d4 = do_assign(d3,delta[b,j,i,n,3],cfg.coord_scale*(t_h-pre[3]))
-    d5 = do_assign(d4,delta[b,j,i,n,4],cfg.object_scale*(iou-pre[4])*sigmoid_gradient(pre[4]))
+    t_x = truths_in_net[...,0:1]
+    t_y = truths_in_net[...,1:2]
+    t_w = truths_in_net[...,2:3]
+    t_h = truths_in_net[...,3:4]
+
+    delta_x = cfg.coord_scale * (t_x - tf.sigmoid(net[...,0:1])) * sigmoid_gradient(tf.sigmoid(net[...,0:1]))
+    delta_y = cfg.coord_scale * (t_y - tf.sigmoid(net[...,1:2])) * sigmoid_gradient(tf.sigmoid(net[...,1:2]))
+    delta_w = cfg.coord_scale * (t_w - net[...,2:3])
+    delta_h = cfg.coord_scale * (t_h - net[...,3:4])
+#    print delta_x
 
 
 
-
-    return d5
-
-def _delta_by_truths(truths,net,preds,delta):
-    t_x = truths[...,0:1]
-    t_y = truths[...,1:2]
-    t_x = t_x * cfg.cell_size
-    t_y = t_y * cfg.cell_size
-
-    t_shift_x = t_x * 0
-    t_shift_y = t_y * 0
-
-    truths_shift = tf.concat(2,[t_shift_x,t_shift_y,truths[...,2:4]])
-
-    p_x = preds[...,0:1]
-    p_y = preds[...,1:2]
-    p_shift_x = p_x * 0
-    p_shift_y = p_y * 0
-    #print preds[:,1,1,:,:]
-    #print truths
-
-    preds_shift = tf.concat(4,[p_shift_x,p_shift_y,preds[...,2:4]])
-
-    # 8. compute shift_iou and best_shift_iou_by_pred
-    #shift_iou = box_iou_by_pred(preds_shift,truths_shift)
-    #print shift_iou
-    #best_shift_iou_by_pred = tf.reduce_max(shift_iou,-1,keep_dims=True)
-    #print best_shift_iou_by_pred
-    
-    #print t_x
-    for b in xrange(truths.get_shape()[0]):
-        for t in xrange(30):
-            i = t_x[b,t,0]
-            j = t_y[b,t,0]
-            i =tf.to_int32(i)
-            j =tf.to_int32(j)
-            shift_iou = box_iou_by_truths(preds_shift,truths_shift,b,i,j,t)
-            best_shift_iou = tf.reduce_max(shift_iou,-1,keep_dims=True)
-            #print shift_iou
-            best_shift_n = tf.arg_max(shift_iou,0)
-            best_shift_n =tf.to_int32(best_shift_n)
-        
-            #print best_shift_n
-            delta_box = _delta_region_box(truths,net,preds,cfg.anchors,cfg.coord_scale,b,i,j,best_shift_n,t,delta)
-            print delta_box
-
-    return delta_box
+    return tf.concat(4,[delta_x,delta_y,delta_w,delta_h])
 
 
+def _delta_region_class(net_out,truths_in_net):
+    delta_region_class = cfg.class_scale * (truths_in_net[...,5:] - net_out[...,5:])
+    return delta_region_class
+
+#def _delta_by_truths(truths,net,preds,delta):
+#    t_x = truths[...,0:1]
+#    t_y = truths[...,1:2]
+#    t_x = t_x * cfg.cell_size
+#    t_y = t_y * cfg.cell_size
+#
+#    t_shift_x = t_x * 0
+#    t_shift_y = t_y * 0
+#
+#    truths_shift = tf.concat(2,[t_shift_x,t_shift_y,truths[...,2:4]])
+#
+#    p_x = preds[...,0:1]
+#    p_y = preds[...,1:2]
+#    p_shift_x = p_x * 0
+#    p_shift_y = p_y * 0
+#    #print preds[:,1,1,:,:]
+#    #print truths
+#
+#    preds_shift = tf.concat(4,[p_shift_x,p_shift_y,preds[...,2:4]])
+#
+#    # 8. compute shift_iou and best_shift_iou_by_pred
+#    #shift_iou = box_iou_by_pred(preds_shift,truths_shift)
+#    #print shift_iou
+#    #best_shift_iou_by_pred = tf.reduce_max(shift_iou,-1,keep_dims=True)
+#    #print best_shift_iou_by_pred
+#    
+#    #print t_x
+#    for b in xrange(truths.get_shape()[0]):
+#        for t in xrange(30):
+#            i = t_x[b,t,0]
+#            j = t_y[b,t,0]
+#            i =tf.to_int32(i)
+#            j =tf.to_int32(j)
+#            shift_iou = box_iou_by_truths(preds_shift,truths_shift,b,i,j,t)
+#            best_shift_iou = tf.reduce_max(shift_iou,-1,keep_dims=True)
+#            #print shift_iou
+#            best_shift_n = tf.arg_max(shift_iou,0)
+#            best_shift_n =tf.to_int32(best_shift_n)
+#        
+#            #print best_shift_n
+#            #delta_box = _delta_region_box(truths,net,preds,cfg.anchors,cfg.coord_scale,b,i,j,best_shift_n,t,delta)
+#            #print delta_box
+#
+#    return delta_box
+#
 
 
-def loss(net,labels,delta_mask):
+
+def loss(net,labels,delta_mask,truths_in_net):
     net_out = tf_post_process(net)
     #delta = tf.Variable(tf.zeros(net_out.get_shape()))
 
@@ -329,7 +325,7 @@ def loss(net,labels,delta_mask):
     delta_mask = tf.logical_and(delta_mask, best_iou_mask)
     #stat.count = tf.count_nonzero(delta_mask[...,4:5])
 
-    print delta_mask
+    #print delta_mask
     mask_iou = tf.where(delta_mask[...,0:1], best_iou_by_pred, best_iou_by_pred*0)
     # print avg_iou
     stat.avg_iou = tf.reduce_sum(mask_iou)
@@ -338,7 +334,7 @@ def loss(net,labels,delta_mask):
     delta_scales = tf.where(delta_mask[...,4:5], delta_obj_scales, delta_scales)
     mask_obj = tf.where(delta_mask[...,4:5], delta_scales,delta_scales*0)
     #print avg_obj
-    print mask_obj
+    #print mask_obj
     
     stat.avg_obj = tf.reduce_sum(mask_obj)
     stat.count = tf.count_nonzero(mask_obj)
@@ -350,14 +346,20 @@ def loss(net,labels,delta_mask):
 
 
     # 9. compute delta_region_box
+    delta_region_box = _delta_region_box(net, truths_in_net)
+    delta_region_box = tf.where(delta_mask[...,0:4], delta_region_box, delta_region_box * 0)
     #delta = _delta_by_truths(truths,net,preds,delta)
+    print delta_region_box
     
-    #pred_class = net_out[...,5:]
-    #delta_class = tf.nn.softmax_cross_entropy_with_logits(pred_class,truths[...,4:5])
-    #print delta
     # 10. compute delta_region_class
+    delta_region_class = _delta_region_class(net_out,truths_in_net)
+    delta_region_class = tf.where(delta_mask[...,5:],delta_region_class, delta_region_class * 0)
+    stat.avg_cat = tf.reduce_sum(delta_region_class)
 
-    return delta_scales
+    delta = tf.concat(4, [delta_region_box,delta_scales,delta_region_class])
+    print delta
+    stat.cost = tf.reduce_sum(tf.pow(delta,2))
+    return delta
 
 def _delta_mask(labels):
     shape = labels.shape
@@ -381,9 +383,34 @@ def _delta_mask(labels):
                 delta_mask[b,y,x,:,0:5] = True
                 #print delta_mask[b,y,x,:,:]
                 
-    print "label count:%s" %(np.count_nonzero(delta_mask)/30)
+    #print "label count:%s" %(np.count_nonzero(delta_mask)/30)
     return delta_mask
 
+def _truths_in_net(labels):
+    shape = labels.shape
+    batch = shape[0]
+    box_num = shape[1]
+    # init mask
+    net_shape = (labels.shape[0],cfg.cell_size,cfg.cell_size,5,85)
+    truths_in_net = np.zeros(net_shape,dtype=np.float32)
+    x = 0
+    y = 0
+    c = 0
+    # compute truths_in_net
+    for b in xrange(batch):
+        for n in xrange(box_num):
+            if labels[b,n,0] > 0.00001:
+                x = np.int(labels[b,n,0] * cfg.cell_size)
+                y = np.int(labels[b,n,1] * cfg.cell_size)
+                c = np.int(labels[b,n,4])
+                truths_in_net[b,y,x,:,5+c] = 1.0
+                truths_in_net[b,y,x,:,0:1] = labels[b,n,0:1] * cfg.cell_size - x
+                truths_in_net[b,y,x,:,1:2] = labels[b,n,1:2] * cfg.cell_size - y
+                for bp in xrange(cfg.boxes_per_cell):
+                    truths_in_net[b,y,x,bp,2:3] = np.log(labels[b,n,2:3] * cfg.cell_size / cfg.anchors[2*bp])
+                    truths_in_net[b,y,x,bp,3:4] = np.log(labels[b,n,3:4] * cfg.cell_size / cfg.anchors[2*bp+1])
+
+    return truths_in_net
 
 
 
@@ -397,13 +424,15 @@ def train():
 
     images,labels = voc.get_next_batch()
     delta_mask = _delta_mask(labels)
+    truths_in_net = _truths_in_net(labels)
 
     train_imgs = tf.placeholder(dtype=tf.float32,shape=images.shape)
     train_lbls = tf.placeholder(dtype=tf.float32,shape=labels.shape)
     train_mask = tf.placeholder(dtype=tf.bool,shape=delta_mask.shape)
+    train_truthinnet = tf.placeholder(dtype=tf.float32,shape=truths_in_net.shape)
 
     net = yolo.yolo_net(train_imgs,images.shape[0],trainable=True)
-    t_loss = loss(net,train_lbls,train_mask)
+    t_loss = loss(net,train_lbls,train_mask,train_truthinnet)
     train_op = tf.train.MomentumOptimizer(cfg.learning_rate,cfg.momentum).minimize(t_loss)
 
 
@@ -416,16 +445,20 @@ def train():
     avg_noobj = 0
     count = 0
     recall = 0
+    avg_cat = 0
+    cost = 0
 
     for i in xrange(cfg.max_steps):
         with sess.as_default():
             if i % 2 == 0:
-                print('step:%s,avg_iou:%s,avg_obj:%s,avg_noobj:%s,count:%s,recall:%s' % (i,avg_iou,avg_obj,avg_noobj,count,recall))
+                print('step:%s,cost:%s,avg_iou:%s,avg_obj:%s,avg_noobj:%s,count:%s,recall:%s,avg_class:%s' % (i,cost,avg_iou,avg_obj,avg_noobj,count,recall,avg_cat))
             else:
-                _,avg_iou,avg_obj,avg_noobj,count,recall= sess.run([train_op,stat.avg_iou,stat.avg_obj,stat.avg_anyobj,stat.count,stat.recall], feed_dict={train_imgs: images, train_lbls: labels,train_mask:delta_mask})
+                _,avg_iou,avg_obj,avg_noobj,count,recall,avg_cat,cost= sess.run([train_op,stat.avg_iou,stat.avg_obj,stat.avg_anyobj,stat.count,stat.recall,stat.avg_cat,stat.cost], 
+                        feed_dict={train_imgs: images, train_lbls: labels,train_mask:delta_mask,train_truthinnet:truths_in_net})
 
         images,labels = voc.get_next_batch()
         delta_mask = _delta_mask(labels)
+        truths_in_net = _truths_in_net(labels)
 
     train_writer.add_summary(i)
     sess.close()
