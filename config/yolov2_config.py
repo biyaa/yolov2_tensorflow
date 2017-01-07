@@ -5,7 +5,8 @@ import numpy as np
 #
 
 train_data_path='/mnt/disk4/nn/datasets/VOC/train.txt'
-train_log_path='/mnt/disk4/nn/tf-env/tim/yolov2_tensorflow/ckpt'
+train_log_path='/mnt/disk4/nn/tf-env/tim/yolov2_tensorflow/ckpt/logs'
+train_ckpt_path='/mnt/disk4/nn/tf-env/tim/yolov2_tensorflow/ckpt/yolo.ckpt-11'
 object_scale=5
 noobject_scale=1
 class_scale=1

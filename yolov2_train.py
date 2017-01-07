@@ -154,7 +154,8 @@ def tf_post_process(predicts):
     p_h = predicts[...,3]
     p_c = predicts[...,4:5] #scale
     
-    p_index = tf.where(p_x>-99999)
+    p_index = tf.where(p_x * 0> -1)
+    print p_index, p_x
     p_row = tf.reshape(tf.to_float(p_index[:,1:2]),p_x.get_shape())
     p_col = tf.reshape(tf.to_float(p_index[:,2:3]),p_x.get_shape())
     #p_b = tf.reshape(p_index[:,3:4],p_x.get_shape())
@@ -431,15 +432,27 @@ def train():
     train_mask = tf.placeholder(dtype=tf.bool,shape=delta_mask.shape)
     train_truthinnet = tf.placeholder(dtype=tf.float32,shape=truths_in_net.shape)
 
+    global_step = tf.Variable(0, trainable=False, name='global_step')
+
     net = yolo.yolo_net(train_imgs,images.shape[0],trainable=True)
     t_loss = loss(net,train_lbls,train_mask,train_truthinnet)
-    train_op = tf.train.MomentumOptimizer(cfg.learning_rate,cfg.momentum).minimize(t_loss)
+    train_op = tf.train.MomentumOptimizer(cfg.learning_rate,cfg.momentum).minimize(t_loss, global_step=global_step)
 
 
+    feed_dict = {train_imgs: images, train_lbls: labels,train_mask:delta_mask,train_truthinnet:truths_in_net}
+    train_ops = [train_op,stat.avg_iou,stat.avg_obj,stat.avg_anyobj,stat.count,stat.recall,stat.avg_cat,stat.cost]
+
+
+    saver = tf.train.Saver(yolo.slim.get_model_variables())
+    saver1 = tf.train.Saver()#yolo.slim.get_model_variables())
     init = tf.global_variables_initializer()
     sess = tf.Session()
-    writer = tf.summary.FileWriter("logs/",sess.graph)
     sess.run(init)
+    saver.restore(sess,cfg.train_ckpt_path)
+
+    print "Weights restored."
+    writer = tf.summary.FileWriter("logs/",sess.graph)
+
     avg_iou = 0
     avg_obj = 0
     avg_noobj = 0
@@ -450,12 +463,16 @@ def train():
 
     for i in xrange(cfg.max_steps):
         with sess.as_default():
-            if i % 2 == 0:
-                print('step:%s,cost:%s,avg_iou:%s,avg_obj:%s,avg_noobj:%s,count:%s,recall:%s,avg_class:%s' % (i,cost,avg_iou,avg_obj,avg_noobj,count,recall,avg_cat))
-            else:
-                _,avg_iou,avg_obj,avg_noobj,count,recall,avg_cat,cost= sess.run([train_op,stat.avg_iou,stat.avg_obj,stat.avg_anyobj,stat.count,stat.recall,stat.avg_cat,stat.cost], 
-                        feed_dict={train_imgs: images, train_lbls: labels,train_mask:delta_mask,train_truthinnet:truths_in_net})
+            _,avg_iou,avg_obj,avg_noobj,count,recall,avg_cat,cost= sess.run(train_ops, feed_dict=feed_dict)
 
+            if i % 10 == 0:
+                print('step:%s,cost:%s,avg_iou:%s,avg_obj:%s,avg_noobj:%s,count:%s,recall:%s,avg_class:%s' % (i,cost,avg_iou,avg_obj,avg_noobj,count,recall,avg_cat))
+
+            if i % 1000 == 0:
+                print('global_step: %s' % tf.train.global_step(sess, global_step))
+                saver1.save(sess,'ckpt/yolo.ckpt', global_step=global_step)
+
+        
         images,labels = voc.get_next_batch()
         delta_mask = _delta_mask(labels)
         truths_in_net = _truths_in_net(labels)
