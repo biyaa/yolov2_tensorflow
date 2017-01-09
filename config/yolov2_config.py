@@ -18,7 +18,7 @@ learning_rate = 0.00001
 max_steps = 50000
 
 test_path = 'test'
-test_img = os.path.join(test_path, 'dog.jpg')
+test_img = os.path.join(test_path, 'scene.jpg')
 cell_size = 13
 num_class = 80
 boxes_per_cell = 5

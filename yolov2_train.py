@@ -146,6 +146,8 @@ def tf_post_process(predicts):
     # 1. x,y,w,h处理
     # 2. scale处理
     # 3. class处理
+    # 4. nan 处理
+    predicts = tf.clip_by_value(predicts,1e-10,1e10)
     p_coords = predicts[...,:5]
     p_classes = predicts[...,5:]
     p_x = predicts[...,0:1]
@@ -154,10 +156,11 @@ def tf_post_process(predicts):
     p_h = predicts[...,3]
     p_c = predicts[...,4:5] #scale
     
-    p_index = tf.where(p_x * 0> -1)
+    p_zero = tf.zeros_like(p_x)
+    p_index = tf.where(p_zero > -1)
     print p_index, p_x
-    p_row = tf.reshape(tf.to_float(p_index[:,1:2]),p_x.get_shape())
-    p_col = tf.reshape(tf.to_float(p_index[:,2:3]),p_x.get_shape())
+    p_row = tf.reshape(tf.to_float(p_index[...,1:2]),p_x.get_shape())
+    p_col = tf.reshape(tf.to_float(p_index[...,2:3]),p_x.get_shape())
     #p_b = tf.reshape(p_index[:,3:4],p_x.get_shape())
 
     p_x = (p_col + tf.sigmoid(p_x)) /cfg.cell_size
@@ -174,8 +177,11 @@ def tf_post_process(predicts):
     p_classes = p_classes - p_cls_max
     p_classes = tf.nn.softmax(p_classes)
 
+    #p_classes = p_classes * p_c
     #p_probs = p_classes * p_c
-    return tf.concat(4,[p_x,p_y,p_w,p_h,p_c,p_classes])
+    net_out = tf.concat(4,[p_x,p_y,p_w,p_h,p_c,p_classes])
+    net_out = tf.clip_by_value(net_out,1e-10,1e10)
+    return net_out 
 
 def sigmoid_gradient(x):
     return (1-x)*x
@@ -271,6 +277,9 @@ def loss(net,labels,delta_mask,truths_in_net):
     #delta_scales = delta[...,4:5]
     #delta_region_box = delta[...,:4]
     #print delta_mask
+
+    
+
 
     stat.set_zero()
     # 2. compute delta_scales
@@ -439,8 +448,6 @@ def train():
     train_op = tf.train.MomentumOptimizer(cfg.learning_rate,cfg.momentum).minimize(t_loss, global_step=global_step)
 
 
-    feed_dict = {train_imgs: images, train_lbls: labels,train_mask:delta_mask,train_truthinnet:truths_in_net}
-    train_ops = [train_op,stat.avg_iou,stat.avg_obj,stat.avg_anyobj,stat.count,stat.recall,stat.avg_cat,stat.cost]
 
 
     saver = tf.train.Saver(yolo.slim.get_model_variables())
@@ -448,7 +455,7 @@ def train():
     init = tf.global_variables_initializer()
     sess = tf.Session()
     sess.run(init)
-    saver.restore(sess,cfg.train_ckpt_path)
+    saver.restore(sess,cfg.out_file)
 
     print "Weights restored."
     writer = tf.summary.FileWriter("logs/",sess.graph)
@@ -463,12 +470,15 @@ def train():
 
     for i in xrange(cfg.max_steps):
         with sess.as_default():
+            feed_dict = {train_imgs: images, train_lbls: labels,train_mask:delta_mask,train_truthinnet:truths_in_net}
+            train_ops = [train_op,stat.avg_iou,stat.avg_obj,stat.avg_anyobj,stat.count,stat.recall,stat.avg_cat,stat.cost]
             _,avg_iou,avg_obj,avg_noobj,count,recall,avg_cat,cost= sess.run(train_ops, feed_dict=feed_dict)
 
             if i % 10 == 0:
+                print "label count:%s" %(np.count_nonzero(delta_mask)/(30))
                 print('step:%s,cost:%s,avg_iou:%s,avg_obj:%s,avg_noobj:%s,count:%s,recall:%s,avg_class:%s' % (i,cost,avg_iou,avg_obj,avg_noobj,count,recall,avg_cat))
 
-            if i % 1000 == 0:
+            if i % 500 == 0:
                 print('global_step: %s' % tf.train.global_step(sess, global_step))
                 saver1.save(sess,'ckpt/yolo.ckpt', global_step=global_step)
 
@@ -479,8 +489,8 @@ def train():
 
     train_writer.add_summary(i)
     sess.close()
-
-train()
+if __name__ == "__main__":
+    train()
 
 
     

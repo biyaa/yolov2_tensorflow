@@ -16,14 +16,15 @@ def set_zero():
     global count
     global recall
     global cost
-    avg_anyobj = avg_anyobj * 0
-    avg_obj = avg_obj * 0
-    avg_cat = avg_cat * 0
-    avg_iou = avg_iou * 0
-    class_count = class_count * 0
-    count = count * 0
-    recall = recall * 0
-    cost = cost * 0
-    
+    avg_anyobj = _to_zero(avg_anyobj)
+    avg_obj = _to_zero(avg_obj)
+    avg_cat = _to_zero(avg_cat)
+    avg_iou = _to_zero(avg_iou)
+    class_count = _to_zero(class_count)
+    count = _to_zero(count)
+    recall = _to_zero(recall)
+    cost = _to_zero(cost)
 
-
+def _to_zero(v):
+    v = tf.clip_by_value(v,1e-10,1e10)
+    v = v * 0
