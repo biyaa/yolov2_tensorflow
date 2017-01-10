@@ -279,15 +279,16 @@ def loss(net,labels,delta_mask,truths_in_net):
     #print delta_mask
 
     
-
+    scales = net_out[...,4:5]
 
     stat.set_zero()
     # 2. compute delta_scales
-    delta_scales = _delta_noobj_scales(net_out[...,4:5],cfg.noobject_scale)
+    delta_scales = _delta_noobj_scales(scales,cfg.noobject_scale)
     
 
     # 3. compute avg_anyobj
-    stat.avg_anyobj = tf.reduce_sum(net_out[...,4:5])
+    stat.avg_anyobj = tf.reduce_sum(scales)
+    stat.avg_anyobj = stat.avg_anyobj / tf.to_float(tf.reduce_prod(scales.get_shape().as_list()))
     # 4. compute best_iou
     iou_by_pred = box_iou_by_pred(net_out,labels)
     best_iou_by_pred = tf.reduce_max(iou_by_pred,-1,keep_dims=True)
@@ -298,10 +299,11 @@ def loss(net,labels,delta_mask,truths_in_net):
     
     # 6. compose of truths_shift
     truths = labels[...,:4]
+    #truths = truths_in_net[...,:4]
     t_x = truths[...,0:1]
     t_y = truths[...,1:2]
-    t_x = t_x * cfg.cell_size
-    t_y = t_y * cfg.cell_size
+    #t_x = t_x * cfg.cell_size
+    #t_y = t_y * cfg.cell_size
 
     t_shift_x = t_x * 0
     t_shift_y = t_y * 0
@@ -317,12 +319,16 @@ def loss(net,labels,delta_mask,truths_in_net):
 
     p_x = preds[...,0:1]
     p_y = preds[...,1:2]
+    p_w = preds[...,2:3]
+    p_h = preds[...,3:4]
+    p_w = p_w / tf.exp(p_w)
+    p_h = p_h / tf.exp(p_h)
     p_shift_x = p_x * 0
     p_shift_y = p_y * 0
     #print preds[:,1,1,:,:]
     #print truths
 
-    preds_shift = tf.concat(4,[p_shift_x,p_shift_y,preds[...,2:4]])
+    preds_shift = tf.concat(4,[p_shift_x,p_shift_y,p_w,p_h])
 
     iou_shift_by_pred = box_iou_by_pred(preds_shift,truths_shift)
     #print iou_shift_by_pred
@@ -330,7 +336,7 @@ def loss(net,labels,delta_mask,truths_in_net):
     best_iou_shift_n = tf.reduce_max(best_iou_shift_boxes,-2,keep_dims=True)
     best_iou_shift_boxes = best_iou_shift_boxes - best_iou_shift_n
 
-    best_iou_mask = best_iou_shift_boxes>=0
+    best_iou_mask = best_iou_shift_boxes >= 0
     #stat.count = tf.count_nonzero(delta_mask[...,4:5])
     delta_mask = tf.logical_and(delta_mask, best_iou_mask)
     #stat.count = tf.count_nonzero(delta_mask[...,4:5])

@@ -4,7 +4,7 @@ import numpy as np
 # path and dataset parameter
 #
 
-train_data_path='/mnt/disk4/nn/datasets/VOC/train.txt'
+train_data_path='/mnt/disk1/tim/train.txt'
 train_log_path='/mnt/disk4/nn/tf-env/tim/yolov2_tensorflow/ckpt/logs'
 train_ckpt_path='/mnt/disk4/nn/tf-env/tim/yolov2_tensorflow/ckpt/yolo.ckpt-11'
 object_scale=5
@@ -14,7 +14,7 @@ coord_scale=1
 image_size = 416
 batch_size = 8
 momentum=0.9
-learning_rate = 0.00001
+learning_rate = 0.000001
 max_steps = 50000
 
 test_path = 'test'
