@@ -19,6 +19,8 @@ slim = tf.contrib.slim
 voc.set_config(cfg)
 
 
+FT_MIN = -9999999
+FT_MAX = 9999999
 # Load the images and labels.
 #images, labels = voc.gep_nexp_batch()
 #print images.shape[0]
@@ -147,7 +149,7 @@ def tf_post_process(predicts):
     # 2. scale处理
     # 3. class处理
     # 4. nan 处理
-    predicts = tf.clip_by_value(predicts,1e-10,1e10)
+    predicts = tf.clip_by_value(predicts,FT_MIN,FT_MAX)
     p_coords = predicts[...,:5]
     p_classes = predicts[...,5:]
     p_x = predicts[...,0:1]
@@ -180,25 +182,27 @@ def tf_post_process(predicts):
     #p_classes = p_classes * p_c
     #p_probs = p_classes * p_c
     net_out = tf.concat(4,[p_x,p_y,p_w,p_h,p_c,p_classes])
-    net_out = tf.clip_by_value(net_out,1e-10,1e10)
+    net_out = tf.clip_by_value(net_out,FT_MIN,FT_MAX)
     return net_out 
 
 def sigmoid_gradient(x):
     return (1-x)*x
 
 def _delta_obj_scales(pred_scales,cfg_scale,iou):
-    d_scales = cfg_scale * ((iou - pred_scales) * sigmoid_gradient(pred_scales))
+    #d_scales = cfg_scale * ((iou - pred_scales)) * sigmoid_gradient(pred_scales))
+    d_scales = cfg_scale*iou*pred_scales**2/2 + cfg_scale*pred_scales**4/4 + pred_scales**3*(-cfg_scale*iou/3 - cfg_scale/3)
     return d_scales
 
 def _delta_noobj_scales(pred_scales,cfg_scale):
-    d_scales = cfg_scale * ((0 - pred_scales) * sigmoid_gradient(pred_scales))
+    #d_scales = cfg_scale * ((0 - pred_scales) * sigmoid_gradient(pred_scales))
+    d_scales = cfg_scale*pred_scales**4/4 - cfg_scale*pred_scales**3/3
     return d_scales
 
 
 def do_assign(ref,v,value):
     return tf.assign(ref,v.assign(value))
 
-def _delta_region_box(net,truths_in_net):
+def _delta_region_box(net, truths_in_net):
     #print pre[4]
 
     t_x = truths_in_net[...,0:1]
@@ -206,10 +210,14 @@ def _delta_region_box(net,truths_in_net):
     t_w = truths_in_net[...,2:3]
     t_h = truths_in_net[...,3:4]
 
-    delta_x = cfg.coord_scale * (t_x - tf.sigmoid(net[...,0:1])) * sigmoid_gradient(tf.sigmoid(net[...,0:1]))
-    delta_y = cfg.coord_scale * (t_y - tf.sigmoid(net[...,1:2])) * sigmoid_gradient(tf.sigmoid(net[...,1:2]))
-    delta_w = cfg.coord_scale * (t_w - net[...,2:3])
-    delta_h = cfg.coord_scale * (t_h - net[...,3:4])
+    #s*(6*t_x - 4*(t_x + 1)/(1 + exp(-x)) + 3/(1 + exp(-x))**2)/(12*(1 + exp(-x))**2)
+    #delta_x = cfg.coord_scale * (t_x - tf.sigmoid(net[...,0:1]) * sigmoid_gradient(tf.sigmoid(net[...,0:1]))
+    delta_x = cfg.coord_scale*(6*t_x - 4*(t_x + 1)/(1 + tf.exp(-net[...,0:1])) + 3/(1 + tf.exp(-net[...,0:1]))**2)/(12*(1 + tf.exp(-net[...,0:1]))**2)
+    delta_y = cfg.coord_scale*(6*t_y - 4*(t_y + 1)/(1 + tf.exp(-net[...,1:2])) + 3/(1 + tf.exp(-net[...,1:2]))**2)/(12*(1 + tf.exp(-net[...,1:2]))**2)
+    #integrate(delta_w) = s*t_w*x - s*x**2/2 => s*x*(2*t_w - x)/2
+    #delta_w = cfg.coord_scale * (t_w - net[...,2:3])
+    delta_w = cfg.coord_scale * net[...,2:3] * (2 * t_w  - net[...,2:3]) / 2
+    delta_h = cfg.coord_scale * net[...,3:4] * (2 * t_w  - net[...,3:4]) / 2
 #    print delta_x
 
 
@@ -218,7 +226,9 @@ def _delta_region_box(net,truths_in_net):
 
 
 def _delta_region_class(net_out,truths_in_net):
-    delta_region_class = cfg.class_scale * (truths_in_net[...,5:] - net_out[...,5:])
+    # -s*x**2/2 + s*x*y ==> s*x*(-x + 2*y)/2
+    #delta_region_class = cfg.class_scale * (truths_in_net[...,5:] - net_out[...,5:])
+    delta_region_class = -cfg.class_scale * net_out[...,5:]**2/2 + cfg.class_scale * truths_in_net[...,5:] * net_out[...,5:]
     return delta_region_class
 
 #def _delta_by_truths(truths,net,preds,delta):
@@ -278,17 +288,17 @@ def loss(net,labels,delta_mask,truths_in_net):
     #delta_region_box = delta[...,:4]
     #print delta_mask
 
+    stat.set_zero()
     
     scales = net_out[...,4:5]
 
-    stat.set_zero()
     # 2. compute delta_scales
     delta_scales = _delta_noobj_scales(scales,cfg.noobject_scale)
     
 
     # 3. compute avg_anyobj
     stat.avg_anyobj = tf.reduce_sum(scales)
-    stat.avg_anyobj = stat.avg_anyobj / tf.to_float(tf.reduce_prod(scales.get_shape().as_list()))
+    #stat.avg_anyobj = stat.avg_anyobj / tf.to_float(tf.reduce_prod(scales.get_shape().as_list()))
     # 4. compute best_iou
     iou_by_pred = box_iou_by_pred(net_out,labels)
     best_iou_by_pred = tf.reduce_max(iou_by_pred,-1,keep_dims=True)
@@ -362,7 +372,7 @@ def loss(net,labels,delta_mask,truths_in_net):
 
 
     # 9. compute delta_region_box
-    delta_region_box = _delta_region_box(net, truths_in_net)
+    delta_region_box = _delta_region_box(net,  truths_in_net)
     delta_region_box = tf.where(delta_mask[...,0:4], delta_region_box, delta_region_box * 0)
     #delta = _delta_by_truths(truths,net,preds,delta)
     print delta_region_box
@@ -432,8 +442,12 @@ def _truths_in_net(labels):
 
 
     
-def _train(images,labels):
-    return loss(images,labels)
+def _train():
+    optimizer = tf.train.GradientDescentOptimizer(cfg.learning_rate)
+
+
+
+
 
 def train():
     log_dir = cfg.train_log_path
@@ -450,9 +464,16 @@ def train():
     global_step = tf.Variable(0, trainable=False, name='global_step')
 
     net = yolo.yolo_net(train_imgs,images.shape[0],trainable=True)
-    t_loss = loss(net,train_lbls,train_mask,train_truthinnet)
-    train_op = tf.train.MomentumOptimizer(cfg.learning_rate,cfg.momentum).minimize(t_loss, global_step=global_step)
+    #test 
+    post_net = tf_post_process(net)
+    t_test = net[...,4]
+    t_test1 = post_net[...,4]
 
+    t_loss = loss(net,train_lbls,train_mask,train_truthinnet)
+
+    train_op = tf.train.GradientDescentOptimizer(cfg.learning_rate).minimize(t_loss, global_step=global_step)
+
+    #print train_op
 
 
 
@@ -461,26 +482,24 @@ def train():
     init = tf.global_variables_initializer()
     sess = tf.Session()
     sess.run(init)
-    saver.restore(sess,cfg.out_file)
-
+    #saver.restore(sess,cfg.out_file)
     print "Weights restored."
     writer = tf.summary.FileWriter("logs/",sess.graph)
 
-    avg_iou = 0
-    avg_obj = 0
-    avg_noobj = 0
-    count = 0
-    recall = 0
-    avg_cat = 0
-    cost = 0
 
     for i in xrange(cfg.max_steps):
         with sess.as_default():
             feed_dict = {train_imgs: images, train_lbls: labels,train_mask:delta_mask,train_truthinnet:truths_in_net}
-            train_ops = [train_op,stat.avg_iou,stat.avg_obj,stat.avg_anyobj,stat.count,stat.recall,stat.avg_cat,stat.cost]
-            _,avg_iou,avg_obj,avg_noobj,count,recall,avg_cat,cost= sess.run(train_ops, feed_dict=feed_dict)
+            train_ops = [train_op,stat.avg_iou,stat.avg_obj,stat.avg_anyobj,stat.count,stat.recall,stat.avg_cat,stat.cost,t_test,t_test1]
+            _,avg_iou,avg_obj,avg_noobj,count,recall,avg_cat,cost,test,test1= sess.run(train_ops, feed_dict=feed_dict)
 
             if i % 10 == 0:
+                test = test[test<>0]
+                test1 = test1[test1<>0]
+                print "images debug value:",images.sum()/images.size
+                print "o-net debug value:", test
+                print "p-net debug value:", test1
+                print "np-net debug value:", 1/(1+np.exp(-test))
                 print "label count:%s" %(np.count_nonzero(delta_mask)/(30))
                 print('step:%s,cost:%s,avg_iou:%s,avg_obj:%s,avg_noobj:%s,count:%s,recall:%s,avg_class:%s' % (i,cost,avg_iou,avg_obj,avg_noobj,count,recall,avg_cat))
 
