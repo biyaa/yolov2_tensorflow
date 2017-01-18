@@ -187,11 +187,11 @@ def sigmoid_gradient(x):
     return (1-x)*x
 
 def _delta_obj_scales(pred_scales,cfg_scale,iou):
-    d_scales = cfg_scale * ((iou - pred_scales) * sigmoid_gradient(pred_scales))
+    d_scales = cfg_scale * (1/2.0)* tf.pow((iou - pred_scales),2) #* sigmoid_gradient(pred_scales))
     return d_scales
 
 def _delta_noobj_scales(pred_scales,cfg_scale):
-    d_scales = cfg_scale * ((0 - pred_scales) * sigmoid_gradient(pred_scales))
+    d_scales = cfg_scale * (1/2.0) * tf.pow((0 - pred_scales),2) # * sigmoid_gradient(pred_scales))
     return d_scales
 
 
@@ -206,10 +206,10 @@ def _delta_region_box(net,truths_in_net):
     t_w = truths_in_net[...,2:3]
     t_h = truths_in_net[...,3:4]
 
-    delta_x = cfg.coord_scale * (t_x - tf.sigmoid(net[...,0:1])) * sigmoid_gradient(tf.sigmoid(net[...,0:1]))
-    delta_y = cfg.coord_scale * (t_y - tf.sigmoid(net[...,1:2])) * sigmoid_gradient(tf.sigmoid(net[...,1:2]))
-    delta_w = cfg.coord_scale * (t_w - net[...,2:3])
-    delta_h = cfg.coord_scale * (t_h - net[...,3:4])
+    delta_x = cfg.coord_scale * (1/2.0) * tf.pow((t_x - tf.sigmoid(net[...,0:1])),2) # * sigmoid_gradient(tf.sigmoid(net[...,0:1]))
+    delta_y = cfg.coord_scale * (1/2.0) * tf.pow((t_y - tf.sigmoid(net[...,1:2])),2) # * sigmoid_gradient(tf.sigmoid(net[...,1:2]))
+    delta_w = cfg.coord_scale * (1/2.0) * tf.pow((t_w - net[...,2:3])),2)
+    delta_h = cfg.coord_scale * (1/2.0) * tf.pow((t_h - net[...,3:4]),2)
 #    print delta_x
 
 
@@ -218,7 +218,7 @@ def _delta_region_box(net,truths_in_net):
 
 
 def _delta_region_class(net_out,truths_in_net):
-    delta_region_class = cfg.class_scale * (truths_in_net[...,5:] - net_out[...,5:])
+    delta_region_class = cfg.class_scale *(1/2.0) * tf.pow((truths_in_net[...,5:] - net_out[...,5:]),2)
     return delta_region_class
 
 #def _delta_by_truths(truths,net,preds,delta):
@@ -497,6 +497,3 @@ def train():
     sess.close()
 if __name__ == "__main__":
     train()
-
-
-    
