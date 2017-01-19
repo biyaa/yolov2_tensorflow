@@ -356,6 +356,7 @@ def loss(net,labels,delta_mask,truths_in_net):
     # print avg_iou
     stat.avg_iou = tf.reduce_sum(mask_iou)
     stat.recall = tf.count_nonzero(mask_iou>0.5) 
+    #stat.recall = tf.reduce_sum(mask_iou>0.5) 
     delta_obj_scales = _delta_obj_scales(net_out[...,4:5], cfg.object_scale, mask_iou)
     delta_scales = tf.where(delta_mask[...,4:5], delta_obj_scales, delta_scales)
     mask_obj = tf.where(delta_mask[...,4:5], delta_scales,delta_scales*0)
@@ -384,8 +385,8 @@ def loss(net,labels,delta_mask,truths_in_net):
 
     delta = tf.concat(4, [delta_region_box,delta_scales,delta_region_class])
     print delta
-    stat.cost = tf.reduce_sum(tf.pow(delta,2))
-    return delta
+    stat.cost = tf.pow(tf.sqrt(tf.reduce_sum(tf.pow(delta,2))),2)
+    return stat.cost
 
 def _delta_mask(labels):
     shape = labels.shape
@@ -461,7 +462,7 @@ def train():
     train_mask = tf.placeholder(dtype=tf.bool,shape=delta_mask.shape)
     train_truthinnet = tf.placeholder(dtype=tf.float32,shape=truths_in_net.shape)
 
-    global_step = tf.Variable(0, trainable=False, name='global_step')
+    global_step = tf.Variable(45002, trainable=False, name='global_step')
 
     net = yolo.yolo_net(train_imgs,images.shape[0],trainable=True)
     #test 
@@ -471,7 +472,9 @@ def train():
 
     t_loss = loss(net,train_lbls,train_mask,train_truthinnet)
 
-    train_op = tf.train.GradientDescentOptimizer(cfg.learning_rate).minimize(t_loss, global_step=global_step)
+    #tf.train.MomentumOptimizer
+    #train_op = tf.train.GradientDescentOptimizer(cfg.learning_rate).minimize(t_loss, global_step=global_step)
+    train_op = tf.train.MomentumOptimizer(cfg.learning_rate,cfg.momentum).minimize(t_loss, global_step=global_step)
 
     #print train_op
 
@@ -482,7 +485,8 @@ def train():
     init = tf.global_variables_initializer()
     sess = tf.Session()
     sess.run(init)
-    #saver.restore(sess,cfg.out_file)
+    saver.restore(sess,cfg.out_file)
+    #saver.restore(sess,"ckpt/yolo.ckpt-45002")
     print "Weights restored."
     writer = tf.summary.FileWriter("logs/",sess.graph)
 
@@ -501,9 +505,9 @@ def train():
                 print "p-net debug value:", test1
                 print "np-net debug value:", 1/(1+np.exp(-test))
                 print "label count:%s" %(np.count_nonzero(delta_mask)/(30))
-                print('step:%s,cost:%s,avg_iou:%s,avg_obj:%s,avg_noobj:%s,count:%s,recall:%s,avg_class:%s' % (i,cost,avg_iou,avg_obj,avg_noobj,count,recall,avg_cat))
+                print('step:%s,cost:%s,avg_iou:%s,avg_obj:%s,avg_noobj:%s,count:%s,recall:%s,avg_class:%s' % (i,cost,avg_iou,avg_obj,avg_noobj,count,recall/count,avg_cat))
 
-            if i % 500 == 0:
+            if i % 1000 == 0:
                 print('global_step: %s' % tf.train.global_step(sess, global_step))
                 saver1.save(sess,'ckpt/yolo.ckpt', global_step=global_step)
 
@@ -516,6 +520,3 @@ def train():
     sess.close()
 if __name__ == "__main__":
     train()
-
-
-    

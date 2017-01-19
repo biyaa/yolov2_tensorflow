@@ -14,11 +14,11 @@ coord_scale=1
 image_size = 416
 batch_size = 8
 momentum=0.9
-learning_rate = 0.000001
+learning_rate = 0.0000001
 max_steps = 50000
 
 test_path = 'test'
-test_img = os.path.join(test_path, 'scene.jpg')
+test_img = os.path.join(test_path, 'dog.jpg')
 cell_size = 13
 num_class = 80
 boxes_per_cell = 5
