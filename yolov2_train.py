@@ -9,6 +9,7 @@
 """
 
 import tensorflow as tf
+from tensorflow import logging as Log
 import numpy as np
 import config.yolov2_config as cfg
 import utils.pascal_voc as voc
@@ -42,6 +43,7 @@ def box_iou(pred,truth):
     p_y = pred[...,1:2]
     p_w = pred[...,2:3]
     p_h = pred[...,3:4]
+
 
     p_l = p_x - p_w/2
     p_r = p_x + p_w/2
@@ -115,6 +117,8 @@ def box_iou_by_pred(preds,truths):
     p_w = preds[...,2:3]
     p_h = preds[...,3:4]
 
+    Log.debug("p_x:%s",p_x)
+
     p_l = p_x - p_w/2
     p_r = p_x + p_w/2
     p_t = p_y - p_h/2
@@ -133,7 +137,8 @@ def box_iou_by_pred(preds,truths):
     # box intersection
     x_w = tf.minimum(t_r , p_r) - tf.maximum(t_l , p_l)
     x_h = tf.minimum(t_b , p_b) - tf.maximum(t_t , p_t)
-    area_intersction = x_w * x_h
+    #area_intersction = x_w * x_h
+    area_intersction = x_w * x_h *t_w /(t_w+.000001)
     area_intersction = tf.maximum(area_intersction,0)
     
     # box union
@@ -147,7 +152,7 @@ def tf_post_process(predicts):
     # 2. scale处理
     # 3. class处理
     # 4. nan 处理
-    predicts = tf.clip_by_value(predicts,1e-10,1e10)
+    predicts = tf.clip_by_value(predicts,-1e10,1e10)
     p_coords = predicts[...,:5]
     p_classes = predicts[...,5:]
     p_x = predicts[...,0:1]
@@ -180,7 +185,7 @@ def tf_post_process(predicts):
     #p_classes = p_classes * p_c
     #p_probs = p_classes * p_c
     net_out = tf.concat(4,[p_x,p_y,p_w,p_h,p_c,p_classes])
-    net_out = tf.clip_by_value(net_out,1e-10,1e10)
+    net_out = tf.clip_by_value(net_out,-1e10,1e10)
     return net_out 
 
 def sigmoid_gradient(x):
@@ -208,7 +213,7 @@ def _delta_region_box(net,truths_in_net):
 
     delta_x = cfg.coord_scale * (1/2.0) * tf.pow((t_x - tf.sigmoid(net[...,0:1])),2) # * sigmoid_gradient(tf.sigmoid(net[...,0:1]))
     delta_y = cfg.coord_scale * (1/2.0) * tf.pow((t_y - tf.sigmoid(net[...,1:2])),2) # * sigmoid_gradient(tf.sigmoid(net[...,1:2]))
-    delta_w = cfg.coord_scale * (1/2.0) * tf.pow((t_w - net[...,2:3])),2)
+    delta_w = cfg.coord_scale * (1/2.0) * tf.pow((t_w - net[...,2:3]),2)
     delta_h = cfg.coord_scale * (1/2.0) * tf.pow((t_h - net[...,3:4]),2)
 #    print delta_x
 
@@ -288,7 +293,7 @@ def loss(net,labels,delta_mask,truths_in_net):
 
     # 3. compute avg_anyobj
     stat.avg_anyobj = tf.reduce_sum(scales)
-    stat.avg_anyobj = stat.avg_anyobj / tf.to_float(tf.reduce_prod(scales.get_shape().as_list()))
+    #stat.avg_anyobj = stat.avg_anyobj / tf.to_float(tf.reduce_prod(scales.get_shape().as_list()))
     # 4. compute best_iou
     iou_by_pred = box_iou_by_pred(net_out,labels)
     best_iou_by_pred = tf.reduce_max(iou_by_pred,-1,keep_dims=True)
@@ -357,10 +362,6 @@ def loss(net,labels,delta_mask,truths_in_net):
     print delta_scales
     #print best_iou_mask
 
-
-
-
-
     # 9. compute delta_region_box
     delta_region_box = _delta_region_box(net, truths_in_net)
     delta_region_box = tf.where(delta_mask[...,0:4], delta_region_box, delta_region_box * 0)
@@ -374,7 +375,7 @@ def loss(net,labels,delta_mask,truths_in_net):
 
     delta = tf.concat(4, [delta_region_box,delta_scales,delta_region_class])
     print delta
-    stat.cost = tf.reduce_sum(tf.pow(delta,2))
+    stat.cost = tf.reduce_sum(delta)#tf.pow(delta,2))
     return delta
 
 def _delta_mask(labels):
@@ -461,10 +462,13 @@ def train():
     init = tf.global_variables_initializer()
     sess = tf.Session()
     sess.run(init)
-    saver.restore(sess,cfg.out_file)
-
+    #saver.restore(sess,'ckpt/yolo.ckpt-49501')
+    ckpt = tf.train.get_checkpoint_state('ckpt/')
+    print ckpt
+    if ckpt and ckpt.model_checkpoint_path:
+        #saver.restore(sess, cfg.out_file)#ckpt.model_checkpoint_path)
+        saver1.restore(sess, ckpt.model_checkpoint_path)
     print "Weights restored."
-    writer = tf.summary.FileWriter("logs/",sess.graph)
 
     avg_iou = 0
     avg_obj = 0
@@ -493,7 +497,7 @@ def train():
         delta_mask = _delta_mask(labels)
         truths_in_net = _truths_in_net(labels)
 
-    train_writer.add_summary(i)
+        #writer.add_summary(i)
     sess.close()
 if __name__ == "__main__":
     train()

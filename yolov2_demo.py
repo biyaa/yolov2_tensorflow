@@ -107,7 +107,7 @@ def interpret_output(output):
 
 def detect_from_cvmat(inputs):
     #print "inputs:",inputs
-    net = yolo.yolo_net(inputs,1)
+    net = yolo.yolo_net(inputs,1,False)
     init = tf.global_variables_initializer()
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
@@ -116,15 +116,20 @@ def detect_from_cvmat(inputs):
     init_T.tic()
     with tf.Session(config=config) as sess:
         sess.run(init)
-        saver = tf.train.Saver(slim.get_model_variables())
+        saver = tf.train.Saver()#slim.get_model_variables())
         #saver.save(sess,OUT_FILE)
+        ckpt = tf.train.get_checkpoint_state('ckpt/')
         
         init_T.toc()
         print init_T.average_time
         restore_T = Timer()
         restore_T.tic()
-        saver.restore(sess, cfg.out_file)
-        print "weights restore."
+        if ckpt and ckpt.model_checkpoint_path:
+            #saver.restore(sess, cfg.out_file)#ckpt.model_checkpoint_path)
+            saver.restore(sess, ckpt.model_checkpoint_path)
+        print "Weights restored."
+        #saver.restore(sess, cfg.out_file)
+        #print "weights restore."
         restore_T.toc()
         print restore_T.average_time
         run_T = Timer()

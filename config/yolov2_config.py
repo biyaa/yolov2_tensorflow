@@ -4,9 +4,11 @@ import numpy as np
 # path and dataset parameter
 #
 
+yolo_home = ''
 train_data_path='/mnt/disk1/tim/train.txt'
-train_log_path='/mnt/disk4/nn/tf-env/tim/yolov2_tensorflow/ckpt/logs'
-train_ckpt_path='/mnt/disk4/nn/tf-env/tim/yolov2_tensorflow/ckpt/yolo.ckpt-11'
+train_log_path=os.path.join(yolo_home,'ckpt/logs')
+train_ckpt_path=os.path.join(yolo_home,'ckpt/')
+#mnt/disk4/nn/tf-env/tim/yolov2_tensorflow/ckpt/yolo.ckpt-49501
 object_scale=5
 noobject_scale=1
 class_scale=1
@@ -14,11 +16,11 @@ coord_scale=1
 image_size = 416
 batch_size = 8
 momentum=0.9
-learning_rate = 0.000001
-max_steps = 50000
+learning_rate = 0.0000001
+max_steps = 150000
 
 test_path = 'test'
-test_img = os.path.join(test_path, 'scene.jpg')
+test_img = os.path.join(test_path, 'dog.jpg')
 cell_size = 13
 num_class = 80
 boxes_per_cell = 5
