@@ -43,6 +43,9 @@ def _get_rand_one_path():
     #print i
     return train_paths[i]
 
+def _get_one_path(i):
+    return train_paths[i]
+
 def read_image(path):
     image = cv2.imread(path)
     image = cv2.resize(image, (cfg.image_size, cfg.image_size))
@@ -64,14 +67,17 @@ def read_label(path):
     return label
 
 
-def get_next_batch():
+def get_next_batch(begin=None):
     images = np.zeros((cfg.batch_size,cfg.image_size,cfg.image_size,3),dtype=np.float32)
     labels = np.zeros((cfg.batch_size,30,5),dtype=np.float32)
     # load paths from a file
     _get_train_paths()
 
     for i in xrange(cfg.batch_size):
-        path = _get_rand_one_path()
+        if begin is None: 
+            path = _get_rand_one_path()
+        else:
+            path = _get_one_path(begin+i)
         #print path
         images[i] = read_image(path[0])
 
