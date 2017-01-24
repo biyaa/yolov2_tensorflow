@@ -198,11 +198,11 @@ def sigmoid_gradient(x):
 
 def _delta_obj_scales(pred_scales,cfg_scale,iou):
     d_scales = cfg_scale * tf.nn.sigmoid_cross_entropy_with_logits(pred_scales, tf.ones_like(pred_scales)*iou) #* sigmoid_gradient(pred_scales))
-    return d_scales
+    return tf.clip_by_value(d_scales,1e-10,1e10)
 
 def _delta_noobj_scales(pred_scales,cfg_scale):
     d_scales = cfg_scale * tf.nn.sigmoid_cross_entropy_with_logits(pred_scales, 0*pred_scales) # * sigmoid_gradient(pred_scales))
-    return d_scales
+    return tf.clip_by_value(d_scales,1e-10,1e10)
 
 
 def do_assign(ref,v,value):
@@ -228,12 +228,12 @@ def _delta_region_box(net,truths_in_net):
 
 
 
-    return tf.concat(4,[delta_x,delta_y,delta_w,delta_h])
+    return tf.clip_by_value(tf.concat(4,[delta_x,delta_y,delta_w,delta_h]),1e-10,1e5)
 
 
 def _delta_region_class(net_out,truths_in_net):
     delta_region_class = cfg.class_scale * tf.nn.softmax_cross_entropy_with_logits(net_out[...,5:],truths_in_net[...,5:])
-    return delta_region_class
+    return tf.clip_by_value(delta_region_class,1e-10,1.0)
 
 #def _delta_by_truths(truths,net,preds,delta):
 #    t_x = truths[...,0:1]
