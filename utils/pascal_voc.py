@@ -21,7 +21,7 @@ def set_config(config):
     cfg = config
 
 def print_config():
-    print cfg.cell_size
+    print(cfg.cell_size)
 
 def _get_train_paths():
     with open(cfg.train_data_path,'r') as f:
@@ -73,7 +73,7 @@ def get_next_batch(begin=None):
     # load paths from a file
     _get_train_paths()
 
-    for i in xrange(cfg.batch_size):
+    for i in range(cfg.batch_size):
         if begin is None: 
             path = _get_rand_one_path()
         else:

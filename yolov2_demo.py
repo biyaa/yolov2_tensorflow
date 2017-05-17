@@ -107,7 +107,7 @@ def interpret_output(output):
 
 def detect_from_cvmat(inputs):
     #print "inputs:",inputs
-    net = yolo.yolo_net(inputs,1)
+    net = yolo.yolo_net(inputs,1,False)
     init = tf.global_variables_initializer()
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
@@ -123,7 +123,8 @@ def detect_from_cvmat(inputs):
         print init_T.average_time
         restore_T = Timer()
         restore_T.tic()
-        saver.restore(sess, cfg.out_file)
+        #saver.restore(sess, cfg.out_file)
+        saver.restore(sess, 'ckpt/yolo.ckpt-501')
         print "weights restore."
         restore_T.toc()
         print restore_T.average_time

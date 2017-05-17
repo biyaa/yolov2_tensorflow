@@ -50,7 +50,8 @@ def yolo_net(inputs,batch_size,trainable):
         layer25 = layer16
         #layer26 = reorg(layer25,(batch_size,13,13,2048))
         layer26 = slim.array_ops.space_to_depth(layer25,2)
-        layer27 = slim.array_ops.concat(3,[layer26,layer24])
+        layer27 = tf.concat([layer26,layer24],3)
+        #layer27 = slim.array_ops.concat(3,[layer26,layer24])
         layer28 = conv2d(layer27, 1024, [3, 3], 1, padding='SAME', scope='conv28',trainable=trainable)
         layer29 = conv2d_with_linear(layer28, 425, [1, 1], 1, padding='SAME', scope='conv29',trainable=trainable)
         layer29 = slim.array_ops.reshape(layer29,[batch_size,13,13,5,85])
@@ -105,14 +106,14 @@ def xy_add_cr_div_size(inputs,cr,cell_size,name):
 #    #print inputs
 #
 def reorg_bak(inputs,shape):
-    print inputs
+    #print inputs
     #body = lambda x:
     inputs = slim.array_ops.transpose(inputs,perm=[0,3,1,2])
 
-    print inputs
+    print(inputs)
     output = reorg_func(inputs)
     output = slim.array_ops.transpose(output,perm=[0,2,3,1])
-    print output
+    #print output
     return slim.array_ops.reshape(output,shape)
     
 

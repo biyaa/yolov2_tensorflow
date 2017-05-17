@@ -168,7 +168,7 @@ def tf_post_process(predicts):
     
     p_zero = tf.zeros_like(p_x)
     p_index = tf.where(p_zero > -1)
-    print p_index, p_x
+    #print p_index, p_x
     p_row = tf.reshape(tf.to_float(p_index[...,1:2]),p_x.get_shape())
     p_col = tf.reshape(tf.to_float(p_index[...,2:3]),p_x.get_shape())
     #p_b = tf.reshape(p_index[:,3:4],p_x.get_shape())
@@ -372,14 +372,14 @@ def loss(net,labels,delta_mask,truths_in_net):
     
     stat.avg_obj = tf.reduce_sum(mask_obj)
     stat.count = tf.count_nonzero(mask_obj)
-    print delta_scales
+    #print delta_scales
     #print best_iou_mask
 
     # 9. compute delta_region_box
     delta_region_box = _delta_region_box(net, truths_in_net)
     delta_region_box = tf.where(delta_mask[...,0:4], delta_region_box, delta_region_box * 0)
     #delta = _delta_by_truths(truths,net,preds,delta)
-    print delta_region_box
+    #print delta_region_box
     
     # 10. compute delta_region_class
     delta_region_class = _delta_region_class(net_out,truths_in_net)
@@ -391,7 +391,7 @@ def loss(net,labels,delta_mask,truths_in_net):
     slim.losses.add_loss(tf.reduce_sum(delta_scales))
     slim.losses.add_loss(tf.reduce_sum(delta_region_class))
     delta =slim.losses.get_total_loss() #delta_region_box + delta_scales + tf.expand_dims(delta_region_class,4)
-    print delta
+    #print delta
     stat.cost = tf.reduce_sum(delta)#tf.pow(delta,2))
     return delta
 
@@ -407,8 +407,8 @@ def _delta_mask(labels):
     y = 0
     c = 0
     # compute mask
-    for b in xrange(batch):
-        for n in xrange(box_num):
+    for b in range(batch):
+        for n in range(box_num):
             if labels[b,n,0] > 0.00001:
                 x = np.int(labels[b,n,0] * cfg.cell_size)
                 y = np.int(labels[b,n,1] * cfg.cell_size)
@@ -431,8 +431,8 @@ def _truths_in_net(labels):
     y = 0
     c = 0
     # compute truths_in_net
-    for b in xrange(batch):
-        for n in xrange(box_num):
+    for b in range(batch):
+        for n in range(box_num):
             if labels[b,n,0] > 0.00001:
                 x = np.int(labels[b,n,0] * cfg.cell_size)
                 y = np.int(labels[b,n,1] * cfg.cell_size)
@@ -440,7 +440,7 @@ def _truths_in_net(labels):
                 truths_in_net[b,y,x,:,5+c] = 1.0
                 truths_in_net[b,y,x,:,0:1] = labels[b,n,0:1] * cfg.cell_size - x
                 truths_in_net[b,y,x,:,1:2] = labels[b,n,1:2] * cfg.cell_size - y
-                for bp in xrange(cfg.boxes_per_cell):
+                for bp in range(cfg.boxes_per_cell):
                     truths_in_net[b,y,x,bp,2:3] = np.log(labels[b,n,2:3] * cfg.cell_size / cfg.anchors[2*bp])
                     truths_in_net[b,y,x,bp,3:4] = np.log(labels[b,n,3:4] * cfg.cell_size / cfg.anchors[2*bp+1])
 
@@ -484,17 +484,17 @@ def train():
     #print ckpt
     #if ckpt and ckpt.model_checkpoint_path:
     #    saver1.restore(sess, ckpt.model_checkpoint_path)
-    print "Weights restored."
+    print("Weights restored.")
 
 
-    for i in xrange(cfg.max_steps):
+    for i in range(cfg.max_steps):
         with sess.as_default():
             feed_dict = {train_imgs: images, train_lbls: labels,train_mask:delta_mask,train_truthinnet:truths_in_net}
             train_ops = [train_op,stat.avg_iou,stat.avg_obj,stat.avg_anyobj,stat.count,stat.recall,stat.avg_cat,stat.cost]
             _,avg_iou,avg_obj,avg_noobj,count,recall,avg_cat,cost= sess.run(train_ops, feed_dict=feed_dict)
 
             if i % 10 == 0:
-                print "label count:%s" %(np.count_nonzero(delta_mask)/(30))
+                print("label count:%s" %(np.count_nonzero(delta_mask)/(30)))
                 print('step:%s,cost:%s,avg_iou:%s,avg_obj:%s,avg_noobj:%s,count:%s,recall:%s,avg_class:%s' % (i,cost,avg_iou,avg_obj,avg_noobj,count,recall,avg_cat))
 
             if i % 500 == 0:
